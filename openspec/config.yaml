@@ -8,6 +8,17 @@ schema: spec-driven
 #     Tech stack: TypeScript, React, Node.js
 #     We use conventional commits
 #     Domain: e-commerce platform
+context: |
+  Domain: backend API for the Personal Trainer app (personal trainers and their alunos/students).
+  Tech stack: Node.js + TypeScript, NestJS as the web framework, Prisma as the ORM, PostgreSQL as the database.
+  This is a separate repository from the frontend (personal-trainer-web). They communicate only over HTTP -
+  no shared code/types between them.
+  Frontend already has a mocked login with two roles: "personal" (trainer) and "aluno" (student). The personal
+  role has access to more app sections (Alunos, Treinos, Financeiro, Configuracoes) than aluno (Meus Treinos,
+  Meu Perfil), so authorization/role checks matter across the API.
+  Target hosting: start on free tiers (e.g. Neon for Postgres, Render/Railway for the API) for personal trainers
+  to test with, then migrate to paid hosting later. The API should be containerized with Docker from the start
+  so migrating hosts later is just redeploying the same image.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
