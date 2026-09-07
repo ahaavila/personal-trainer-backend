@@ -71,8 +71,24 @@ accounts below. Do not use these credentials outside local development.
 | Personal | `personal@fitforge.app` | `personal123` |
 | Aluno | `aluno@fitforge.app` | `aluno123` |
 
-Log in by sending `POST /api/auth/login` with JSON containing `email` and
-`password`. A successful response includes `token`, `role`, and `name`.
+Authentication uses a cookie-based session. Send login, session-check, and
+logout requests with `credentials: 'include'` so the browser can receive and
+send the HTTP-only session cookie:
+
+```ts
+await fetch('http://localhost:3000/api/auth/login', {
+	method: 'POST',
+	credentials: 'include',
+	headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify({ email, password }),
+});
+```
+
+`POST /api/auth/login` sets the session cookie and returns `{ role, name }`.
+`GET /api/auth/me` returns the current session's `{ role, name }`, or `401`
+when no valid session exists. `POST /api/auth/logout` clears the session
+cookie. The session token is not included in any JSON response and is not
+accessible to client-side JavaScript.
 
 ## Scripts
 
