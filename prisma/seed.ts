@@ -26,6 +26,15 @@ async function main() {
       },
     ],
   });
+
+  const personal = await prisma.user.findUniqueOrThrow({
+    where: { email: 'personal@fitforge.app' },
+  });
+
+  await prisma.user.update({
+    where: { email: 'aluno@fitforge.app' },
+    data: { personalId: personal.id },
+  });
 }
 
 main()

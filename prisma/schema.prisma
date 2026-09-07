@@ -18,11 +18,60 @@ enum Role {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                Int             @id @default(autoincrement())
+  email             String          @unique
+  passwordHash      String
+  name              String
+  role              Role
+  personalId        Int?
+  personal          User?           @relation("PersonalAlunos", fields: [personalId], references: [id])
+  alunos            User[]          @relation("PersonalAlunos")
+  createdExercises  Exercicio[]     @relation("CreatedExercises")
+  authoredFichas    FichaDeTreino[] @relation("AuthoredFichas")
+  assignedFichas    FichaDeTreino[] @relation("AlunoFichas")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model Exercicio {
+  id                  Int                @id @default(autoincrement())
+  name                String
+  muscleGroup         String
+  createdByPersonalId Int
+  createdByPersonal   User               @relation("CreatedExercises", fields: [createdByPersonalId], references: [id])
+  treinoExercicios    TreinoExercicio[]
+}
+
+model FichaDeTreino {
+  id        Int      @id @default(autoincrement())
+  alunoId   Int
+  personalId Int
+  title     String
+  aluno     User     @relation("AlunoFichas", fields: [alunoId], references: [id])
+  personal  User     @relation("AuthoredFichas", fields: [personalId], references: [id])
+  treinos   Treino[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Treino {
+  id                 Int                @id @default(autoincrement())
+  fichaId            Int
+  name               String
+  order              Int
+  ficha              FichaDeTreino      @relation(fields: [fichaId], references: [id])
+  treinoExercicios   TreinoExercicio[]
+
+  @@unique([fichaId, order])
+}
+
+model TreinoExercicio {
+  treinoId   Int
+  exercicioId Int
+  sets       Int
+  reps       Int
+  treino     Treino    @relation(fields: [treinoId], references: [id])
+  exercicio  Exercicio @relation(fields: [exercicioId], references: [id])
+
+  @@id([treinoId, exercicioId])
 }
