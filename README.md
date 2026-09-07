@@ -34,6 +34,7 @@ Apply database migrations and start the API with reload enabled:
 
 ```bash
 npm run prisma:migrate:dev
+npm run prisma:seed
 npm run start:dev
 ```
 
@@ -49,6 +50,30 @@ The endpoint responds with:
 {"status":"ok","service":"personal-trainer-backend"}
 ```
 
+## Authentication
+
+Configure these values in `.env` before deploying:
+
+```dotenv
+JWT_SECRET="use-a-unique-secret-in-production"
+JWT_EXPIRES_IN="1h"
+CORS_ORIGIN="http://localhost:5173"
+```
+
+`CORS_ORIGIN` accepts a comma-separated list of permitted frontend origins. The
+development default is Vite's `http://localhost:5173` origin.
+
+Run `npm run prisma:seed` to reset the development users to the two test-only
+accounts below. Do not use these credentials outside local development.
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Personal | `personal@fitforge.app` | `personal123` |
+| Aluno | `aluno@fitforge.app` | `aluno123` |
+
+Log in by sending `POST /api/auth/login` with JSON containing `email` and
+`password`. A successful response includes `token`, `role`, and `name`.
+
 ## Scripts
 
 ```bash
@@ -59,6 +84,7 @@ npm run test                  # Run unit tests
 npm run prisma:generate       # Generate Prisma Client
 npm run prisma:migrate:dev    # Create and apply a development migration
 npm run prisma:migrate:deploy # Apply committed migrations
+npm run prisma:seed           # Reset the two local test users
 ```
 
 ## Docker
