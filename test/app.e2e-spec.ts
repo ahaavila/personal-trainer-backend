@@ -37,6 +37,10 @@ describe('App API (e2e)', () => {
       data: {
         name: 'Supino reto',
         muscleGroup: 'Peito',
+        description: 'Empurrada horizontal com barra.',
+        defaultSets: 3,
+        defaultReps: '8 a 12',
+        level: 'intermediario',
         createdByPersonalId: personal.id,
       },
     });
@@ -399,6 +403,67 @@ describe('App API (e2e)', () => {
       .set('Cookie', sessionCookie(loginResponse))
       .expect(200)
       .expect([]);
+  });
+
+  it('/api/exercicios (GET) returns the personal library with card fields', async () => {
+    const loginResponse = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/exercicios')
+      .set('Cookie', sessionCookie(loginResponse))
+      .expect(200);
+
+    expect(response.body).toEqual([
+      {
+        name: 'Supino reto',
+        muscleGroup: 'Peito',
+        description: 'Empurrada horizontal com barra.',
+        defaultSets: 3,
+        defaultReps: '8 a 12',
+        level: 'intermediario',
+      },
+    ]);
+  });
+
+  it('/api/exercicios (GET) applies private filters and rejects invalid levels', async () => {
+    const loginResponse = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(loginResponse);
+
+    await request(app.getHttpServer())
+      .get('/api/exercicios?search=supino&muscleGroup=peito&level=intermediario')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body).toHaveLength(1));
+    await request(app.getHttpServer())
+      .get('/api/exercicios?level=unknown')
+      .set('Cookie', cookie)
+      .expect(400);
+  });
+
+  it('/api/exercicios (GET) enforces personal ownership and empty state', async () => {
+    await request(app.getHttpServer()).get('/api/exercicios').expect(401);
+
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/exercicios')
+      .set('Cookie', sessionCookie(alunoLogin))
+      .expect(403);
+
+    const otherPersonalLogin = await login(
+      'other-personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const otherResponse = await request(app.getHttpServer())
+      .get('/api/exercicios')
+      .set('Cookie', sessionCookie(otherPersonalLogin))
+      .expect(200);
+    expect(otherResponse.body).toEqual([]);
   });
 
   it('/api/alunos (POST) creates a safe, owned aluno and allows the new login', async () => {

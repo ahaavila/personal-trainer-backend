@@ -183,6 +183,26 @@ The response is table-ready and excludes passwords and session tokens:
 ]
 ```
 
+## Exercicios
+
+`GET /api/exercicios` is available only to authenticated `personal` users and
+returns exercises created by that personal. It never exposes another
+personal's library or allows aluno access.
+
+Optional filters can be combined with AND semantics:
+
+- `search`: case-insensitive match against exercise name
+- `muscleGroup`: case-insensitive muscle-group match
+- `level`: `iniciante`, `intermediario`, or `avancado`
+
+```bash
+curl -b cookies.txt 'http://localhost:3000/api/exercicios?search=supino&muscleGroup=peito&level=intermediario'
+```
+
+Each result includes `name`, `muscleGroup`, `description`, `defaultSets`,
+`defaultReps`, and `level`. An owner with no exercises receives `200` and an
+empty array; invalid level filters return `400`.
+
 ## Scripts
 
 ```bash

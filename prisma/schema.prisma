@@ -57,6 +57,10 @@ model Exercicio {
   id                  Int                @id @default(autoincrement())
   name                String
   muscleGroup         String
+  description         String             @default("")
+  defaultSets         Int                @default(3)
+  defaultReps         String             @default("8 a 12")
+  level               AlunoLevel         @default(iniciante)
   createdByPersonalId Int
   createdByPersonal   User               @relation("CreatedExercises", fields: [createdByPersonalId], references: [id])
   treinoExercicios    TreinoExercicio[]

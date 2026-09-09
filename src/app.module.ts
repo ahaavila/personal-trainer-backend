@@ -5,6 +5,7 @@ import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { AlunosModule } from './alunos/alunos.module.js';
+import { ExerciciosModule } from './exercicios/exercicios.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     AuthModule,
     DashboardModule,
     AlunosModule,
+    ExerciciosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

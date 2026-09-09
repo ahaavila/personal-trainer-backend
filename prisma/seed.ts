@@ -95,10 +95,26 @@ async function main() {
   ]);
   const [supino, agachamento] = await Promise.all([
     prisma.exercicio.create({
-      data: { name: 'Supino reto', muscleGroup: 'Peito', createdByPersonalId: personal.id },
+      data: {
+        name: 'Supino reto',
+        muscleGroup: 'Peito',
+        description: 'Empurrada horizontal com barra.',
+        defaultSets: 3,
+        defaultReps: '8 a 12',
+        level: 'intermediario',
+        createdByPersonalId: personal.id,
+      },
     }),
     prisma.exercicio.create({
-      data: { name: 'Agachamento livre', muscleGroup: 'Pernas', createdByPersonalId: personal.id },
+      data: {
+        name: 'Agachamento livre',
+        muscleGroup: 'Pernas',
+        description: 'Agachamento com barra livre.',
+        defaultSets: 4,
+        defaultReps: '6 a 10',
+        level: 'avancado',
+        createdByPersonalId: personal.id,
+      },
     }),
   ]);
   const ficha = await prisma.fichaDeTreino.create({
