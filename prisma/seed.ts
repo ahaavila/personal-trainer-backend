@@ -9,7 +9,14 @@ async function main() {
     hashPassword('aluno123'),
   ]);
 
-  await prisma.user.deleteMany();
+  await prisma.$transaction([
+    prisma.treinoExercicio.deleteMany(),
+    prisma.treino.deleteMany(),
+    prisma.fichaDeTreino.deleteMany(),
+    prisma.exercicio.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
+
   await prisma.user.createMany({
     data: [
       {
