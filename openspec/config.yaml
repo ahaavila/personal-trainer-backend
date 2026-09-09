@@ -41,3 +41,10 @@ context: |
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Do not create commits during proposal or apply; leave all feature changes uncommitted until archive.
+  archive:
+    guidance:
+      - Create exactly one commit per feature during archive, including its implementation, synced specs, and archived change artifacts.

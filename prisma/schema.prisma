@@ -17,6 +17,23 @@ enum Role {
   aluno
 }
 
+enum AlunoObjective {
+  hipertrofia
+  emagrecimento
+  condicionamento
+}
+
+enum AlunoLevel {
+  iniciante
+  intermediario
+  avancado
+}
+
+enum AlunoStatus {
+  ativo
+  inativo
+}
+
 model User {
   id                Int             @id @default(autoincrement())
   email             String          @unique
@@ -24,6 +41,9 @@ model User {
   name              String
   role              Role
   personalId        Int?
+  objective         AlunoObjective?
+  level             AlunoLevel?
+  status            AlunoStatus?
   personal          User?           @relation("PersonalAlunos", fields: [personalId], references: [id])
   alunos            User[]          @relation("PersonalAlunos")
   createdExercises  Exercicio[]     @relation("CreatedExercises")
@@ -59,6 +79,7 @@ model Treino {
   fichaId            Int
   name               String
   order              Int
+  completedAt        DateTime?
   ficha              FichaDeTreino      @relation(fields: [fichaId], references: [id])
   treinoExercicios   TreinoExercicio[]
 

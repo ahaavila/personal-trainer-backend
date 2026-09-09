@@ -132,6 +132,41 @@ curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
 curl -b cookies.txt http://localhost:3000/api/dashboard/personal
 ```
 
+## Alunos
+
+`GET /api/alunos` is available only to authenticated `personal` users. It
+returns only alunos assigned to the personal in the session cookie. Unauthenticated
+requests return `401`; authenticated alunos receive `403`.
+
+Optional filters can be combined:
+
+- `search`: case-insensitive match against name or email
+- `status`: `ativo` or `inativo`
+- `objective`: `hipertrofia`, `emagrecimento`, or `condicionamento`
+
+Invalid enum filters return `400`. An account with no matching alunos receives
+`200` and an empty array.
+
+```bash
+curl -b cookies.txt 'http://localhost:3000/api/alunos?status=ativo'
+curl -b cookies.txt 'http://localhost:3000/api/alunos?search=mariana&objective=emagrecimento'
+```
+
+The response is table-ready and excludes passwords and session tokens:
+
+```json
+[
+	{
+		"name": "Mariana Costa",
+		"email": "mariana@fitforge.app",
+		"objective": "emagrecimento",
+		"level": "iniciante",
+		"status": "ativo",
+		"latestWorkout": null
+	}
+]
+```
+
 ## Scripts
 
 ```bash

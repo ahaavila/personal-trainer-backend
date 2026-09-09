@@ -48,7 +48,12 @@ describe('App API (e2e)', () => {
       },
     });
     const workout = await prisma.treino.create({
-      data: { fichaId: plan.id, name: 'Treino A', order: 1 },
+      data: {
+        fichaId: plan.id,
+        name: 'Treino A',
+        order: 1,
+        completedAt: new Date('2026-09-08T10:00:00.000Z'),
+      },
     });
     await prisma.treinoExercicio.create({
       data: { treinoId: workout.id, exercicioId: exercise.id, sets: 3, reps: 12 },
@@ -198,7 +203,7 @@ describe('App API (e2e)', () => {
       .expect(200);
 
     expect(response.body).toEqual({
-      metrics: { clientsCount: 1, exercisesCount: 1, trainingPlansCount: 1 },
+      metrics: { clientsCount: 3, exercisesCount: 1, trainingPlansCount: 1 },
       upcomingTrainings: [
         {
           id: expect.any(Number),
@@ -290,6 +295,110 @@ describe('App API (e2e)', () => {
       .get('/api/dashboard/personal')
       .set('Cookie', sessionCookie(alunoLogin))
       .expect(403);
+  });
+
+  it('/api/alunos (GET) returns only assigned alunos with listing fields', async () => {
+    const loginResponse = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/alunos')
+      .set('Cookie', sessionCookie(loginResponse))
+      .expect(200);
+
+    expect(response.body).toHaveLength(3);
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Mariana Costa',
+          email: 'mariana@fitforge.app',
+          objective: 'emagrecimento',
+          level: 'iniciante',
+          status: 'ativo',
+        }),
+        expect.objectContaining({
+          name: 'Aluno FitForge',
+          email: 'aluno@fitforge.app',
+          objective: 'não informado',
+          level: 'não informado',
+          status: 'não informado',
+          latestWorkout: {
+            name: 'Treino A',
+            completedAt: '2026-09-08T10:00:00.000Z',
+          },
+        }),
+      ]),
+    );
+    expect(response.body.map((aluno: { email: string }) => aluno.email)).not.toContain(
+      'other-aluno@fitforge.app',
+    );
+  });
+
+  it('/api/alunos (GET) applies search, status, objective, and combined filters', async () => {
+    const loginResponse = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(loginResponse);
+
+    await request(app.getHttpServer())
+      .get('/api/alunos?search=MARIANA')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body.map((aluno: { email: string }) => aluno.email)).toEqual(['mariana@fitforge.app']));
+    await request(app.getHttpServer())
+      .get('/api/alunos?status=inativo')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body.map((aluno: { email: string }) => aluno.email)).toEqual(['lucas@fitforge.app']));
+    await request(app.getHttpServer())
+      .get('/api/alunos?objective=emagrecimento')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body.map((aluno: { email: string }) => aluno.email)).toEqual(['mariana@fitforge.app']));
+    await request(app.getHttpServer())
+      .get('/api/alunos?search=Mariana&status=ativo&objective=emagrecimento')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body.map((aluno: { email: string }) => aluno.email)).toEqual(['mariana@fitforge.app']));
+  });
+
+  it('/api/alunos (GET) rejects invalid filters and unauthenticated/wrong-role access', async () => {
+    await request(app.getHttpServer()).get('/api/alunos').expect(401);
+
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/alunos')
+      .set('Cookie', sessionCookie(alunoLogin))
+      .expect(403);
+
+    const personalLogin = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    await request(app.getHttpServer())
+      .get('/api/alunos?status=unknown')
+      .set('Cookie', sessionCookie(personalLogin))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/alunos?objective=unknown')
+      .set('Cookie', sessionCookie(personalLogin))
+      .expect(400);
+  });
+
+  it('/api/alunos (GET) returns an empty list for a personal without assigned alunos', async () => {
+    const loginResponse = await login(
+      'empty-personal@fitforge.app',
+      'empty123',
+    ).expect(200);
+
+    await request(app.getHttpServer())
+      .get('/api/alunos')
+      .set('Cookie', sessionCookie(loginResponse))
+      .expect(200)
+      .expect([]);
   });
 
   afterAll(async () => {
