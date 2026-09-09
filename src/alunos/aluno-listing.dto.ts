@@ -1,5 +1,13 @@
 import type { AlunoObjective, AlunoStatus } from '@prisma/client';
 
+export interface CreateAlunoDto {
+  name?: unknown;
+  email?: unknown;
+  password?: unknown;
+  objective?: unknown;
+  level?: unknown;
+}
+
 export interface AlunoListingQuery {
   search?: string;
   status?: string;

@@ -152,6 +152,22 @@ curl -b cookies.txt 'http://localhost:3000/api/alunos?status=ativo'
 curl -b cookies.txt 'http://localhost:3000/api/alunos?search=mariana&objective=emagrecimento'
 ```
 
+Create an aluno from a personal session with `POST /api/alunos`. The server
+derives the owner, role, and active status; `personalId`, `role`, and `status`
+are never accepted from the client:
+
+```bash
+curl -b cookies.txt -X POST http://localhost:3000/api/alunos \
+	-H 'Content-Type: application/json' \
+	-d '{"name":"Novo Aluno","email":"novo@fitforge.app","password":"temporary123","objective":"hipertrofia","level":"iniciante"}'
+```
+
+The response contains only safe listing fields and never contains the temporary
+password, password hash, JWT, or session value. The temporary password must be
+delivered to the aluno through the appropriate trusted process; it is not
+logged or returned by the API. Email addresses must be unique, and duplicate
+emails return `409`. Missing or invalid fields return `400`.
+
 The response is table-ready and excludes passwords and session tokens:
 
 ```json

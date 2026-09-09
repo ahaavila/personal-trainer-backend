@@ -401,6 +401,88 @@ describe('App API (e2e)', () => {
       .expect([]);
   });
 
+  it('/api/alunos (POST) creates a safe, owned aluno and allows the new login', async () => {
+    const loginResponse = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(loginResponse);
+    const email = `created-${Date.now()}@fitforge.app`;
+
+    const response = await request(app.getHttpServer())
+      .post('/api/alunos')
+      .set('Cookie', cookie)
+      .send({
+        name: 'Novo Aluno',
+        email,
+        password: 'temporary123',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      name: 'Novo Aluno',
+      email,
+      objective: 'hipertrofia',
+      level: 'iniciante',
+      status: 'ativo',
+      latestWorkout: null,
+    });
+    expect(JSON.stringify(response.body)).not.toMatch(/password|hash|token|session/i);
+
+    const listing = await request(app.getHttpServer())
+      .get('/api/alunos?search=Novo%20Aluno')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(listing.body).toEqual([response.body]);
+
+    const createdLogin = await login(email, 'temporary123').expect(200);
+    expect(createdLogin.body).toMatchObject({ role: 'aluno', name: 'Novo Aluno' });
+  });
+
+  it('/api/alunos (POST) rejects unauthorized, invalid, and duplicate creation', async () => {
+    await request(app.getHttpServer())
+      .post('/api/alunos')
+      .send({ name: 'No Session' })
+      .expect(401);
+
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .post('/api/alunos')
+      .set('Cookie', sessionCookie(alunoLogin))
+      .send({
+        name: 'Forbidden',
+        email: 'forbidden@fitforge.app',
+        password: 'temporary123',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+      })
+      .expect(403);
+
+    const personalLogin = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(personalLogin);
+    await request(app.getHttpServer())
+      .post('/api/alunos')
+      .set('Cookie', cookie)
+      .send({ name: 'A', email: 'invalid', password: 'short' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/api/alunos')
+      .set('Cookie', cookie)
+      .send({
+        name: 'Duplicate',
+        email: 'aluno@fitforge.app',
+        password: 'temporary123',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+      })
+      .expect(409);
+  });
+
   afterAll(async () => {
     await app.close();
   });

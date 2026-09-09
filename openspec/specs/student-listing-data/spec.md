@@ -17,6 +17,10 @@ The system SHALL provide an authenticated, personal-only aluno listing endpoint 
 - **WHEN** an authenticated personal has no assigned alunos
 - **THEN** the API responds successfully with an empty list
 
+#### Scenario: Newly created aluno appears in owner listing
+- **WHEN** a personal creates an aluno and requests the aluno listing
+- **THEN** the API includes the new aluno only in that personal's listing
+
 ### Requirement: Aluno listing can be filtered
 The aluno listing endpoint SHALL accept optional name/email search, status, and objective filters and apply all supplied filters to the requesting personal's assigned alunos.
 

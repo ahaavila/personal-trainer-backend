@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { AlunoObjective, AlunoStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { AlunoListingDto, AlunoListingQuery } from './aluno-listing.dto.js';
+import { hashPassword } from '../auth/password.js';
+import type {
+  AlunoListingDto,
+  AlunoListingQuery,
+  CreateAlunoDto,
+} from './aluno-listing.dto.js';
 
 const OBJECTIVES = Object.values(AlunoObjective);
 const STATUSES = Object.values(AlunoStatus);
@@ -58,6 +67,87 @@ export class AlunosService {
       status: aluno.status ?? 'não informado',
       latestWorkout: this.latestWorkout(aluno.assignedFichas),
     }));
+  }
+
+  async create(personalId: number, input: CreateAlunoDto): Promise<AlunoListingDto> {
+    const data = this.validateCreateInput(input);
+
+    try {
+      const aluno = await this.prisma.user.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          passwordHash: await hashPassword(data.password),
+          role: 'aluno',
+          personalId,
+          objective: data.objective,
+          level: data.level,
+          status: 'ativo',
+        },
+        select: {
+          name: true,
+          email: true,
+          objective: true,
+          level: true,
+          status: true,
+        },
+      });
+
+      return {
+        ...aluno,
+        objective: aluno.objective ?? 'não informado',
+        level: aluno.level ?? 'não informado',
+        status: aluno.status ?? 'não informado',
+        latestWorkout: null,
+      };
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Email is already in use');
+      }
+
+      throw error;
+    }
+  }
+
+  private validateCreateInput(input: CreateAlunoDto) {
+    if (
+      typeof input.name !== 'string' ||
+      input.name.trim().length < 2 ||
+      typeof input.email !== 'string' ||
+      !/^\S+@\S+\.\S+$/.test(input.email.trim()) ||
+      typeof input.password !== 'string' ||
+      input.password.length < 8
+    ) {
+      throw new BadRequestException('Invalid aluno data');
+    }
+
+    const objective = this.validateEnumFilter(
+      typeof input.objective === 'string' ? input.objective : undefined,
+      OBJECTIVES,
+      'objective',
+    );
+    const level = this.validateEnumFilter(
+      typeof input.level === 'string' ? input.level : undefined,
+      Object.values(['iniciante', 'intermediario', 'avancado']),
+      'level',
+    );
+
+    if (!objective || !level) {
+      throw new BadRequestException('Invalid aluno data');
+    }
+
+    return {
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      objective,
+      level: level as 'iniciante' | 'intermediario' | 'avancado',
+    };
   }
 
   private validateEnumFilter<T extends string>(
