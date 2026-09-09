@@ -14,11 +14,11 @@ The system SHALL record which personal manages which alunos, so a personal's lis
 - **THEN** the system can determine, from stored data, that the aluno belongs to that personal's list of alunos along with their objective, level, and status
 
 ### Requirement: Exercise catalog is stored
-The system SHALL store exercises, each with a name, a muscle group, description, default sets, default repetitions, level, and a reference to the personal who created it.
+The system SHALL store exercises, each with a name, a muscle group, optional equipment, description, default sets, default repetitions, level, a reference to the personal who created it, and optional execution media metadata.
 
 #### Scenario: An exercise exists
 - **WHEN** an exercise has been created by a personal
-- **THEN** the system can retrieve its name, muscle group, description, default sets, default repetitions, level, and creating personal from stored data
+- **THEN** the system can retrieve its name, muscle group, optional equipment, description, default sets, default repetitions, level, creating personal, and optional media metadata from stored data
 
 ### Requirement: Training plans are stored
 The system SHALL store training plans ("fichas de treino"), each belonging to exactly one aluno and authored by exactly one personal.

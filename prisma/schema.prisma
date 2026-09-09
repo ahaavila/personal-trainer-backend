@@ -34,6 +34,11 @@ enum AlunoStatus {
   inativo
 }
 
+enum ExerciseMediaKind {
+  photo
+  video
+}
+
 model User {
   id                Int             @id @default(autoincrement())
   email             String          @unique
@@ -57,6 +62,7 @@ model Exercicio {
   id                  Int                @id @default(autoincrement())
   name                String
   muscleGroup         String
+  equipment           String?
   description         String             @default("")
   defaultSets         Int                @default(3)
   defaultReps         String             @default("8 a 12")
@@ -64,6 +70,20 @@ model Exercicio {
   createdByPersonalId Int
   createdByPersonal   User               @relation("CreatedExercises", fields: [createdByPersonalId], references: [id])
   treinoExercicios    TreinoExercicio[]
+  media               ExerciseMedia[]
+}
+
+model ExerciseMedia {
+  id          Int               @id @default(autoincrement())
+  exercicioId Int
+  kind        ExerciseMediaKind
+  objectKey   String
+  contentType String
+  byteSize    Int
+  createdAt   DateTime          @default(now())
+  exercicio   Exercicio         @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
+
+  @@unique([exercicioId, kind])
 }
 
 model FichaDeTreino {

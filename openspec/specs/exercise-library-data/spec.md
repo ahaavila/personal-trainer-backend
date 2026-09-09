@@ -17,6 +17,10 @@ The system SHALL provide an authenticated personal-only exercise listing endpoin
 - **WHEN** an authenticated personal has no exercises
 - **THEN** the API responds successfully with an empty list
 
+#### Scenario: Newly created exercise appears in owner library
+- **WHEN** a personal creates an exercise and requests the listing
+- **THEN** the API includes the new exercise only in that personal's library
+
 ### Requirement: Exercise list supports filters
 The endpoint SHALL accept optional name search, muscle-group, and level filters and apply all supplied filters to the requesting personal's exercises.
 

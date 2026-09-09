@@ -26,6 +26,9 @@ describe('App API (e2e)', () => {
     await prisma.treino.deleteMany();
     await prisma.fichaDeTreino.deleteMany();
     await prisma.exercicio.deleteMany();
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: 'created-' } },
+    });
 
     const personal = await prisma.user.findUniqueOrThrow({
       where: { email: 'personal@fitforge.app' },
@@ -37,6 +40,7 @@ describe('App API (e2e)', () => {
       data: {
         name: 'Supino reto',
         muscleGroup: 'Peito',
+        equipment: null,
         description: 'Empurrada horizontal com barra.',
         defaultSets: 3,
         defaultReps: '8 a 12',
@@ -420,6 +424,7 @@ describe('App API (e2e)', () => {
       {
         name: 'Supino reto',
         muscleGroup: 'Peito',
+        equipment: null,
         description: 'Empurrada horizontal com barra.',
         defaultSets: 3,
         defaultReps: '8 a 12',
@@ -464,6 +469,34 @@ describe('App API (e2e)', () => {
       .set('Cookie', sessionCookie(otherPersonalLogin))
       .expect(200);
     expect(otherResponse.body).toEqual([]);
+  });
+
+  it('/api/exercicios (POST) creates a safe owned exercise', async () => {
+    const loginResponse = await login('personal@fitforge.app', 'personal123').expect(200);
+    const response = await request(app.getHttpServer())
+      .post('/api/exercicios')
+      .set('Cookie', sessionCookie(loginResponse))
+      .send({ name: 'Levantamento terra', muscleGroup: 'Costas', equipment: 'Barra', level: 'avancado', description: 'Movimento composto.', defaultSets: 4, defaultReps: '5 a 8' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({ name: 'Levantamento terra', muscleGroup: 'Costas', equipment: 'Barra', level: 'avancado', defaultSets: 4, defaultReps: '5 a 8', media: [] });
+    expect(JSON.stringify(response.body)).not.toMatch(/password|hash|token|session/i);
+  });
+
+  it('/api/exercicios (POST) rejects invalid/unauthorized creation and disabled media', async () => {
+    await request(app.getHttpServer()).post('/api/exercicios').send({ name: 'No session' }).expect(401);
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer()).post('/api/exercicios').set('Cookie', sessionCookie(alunoLogin)).send({ name: 'Forbidden' }).expect(403);
+
+    const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+    const cookie = sessionCookie(personalLogin);
+    await request(app.getHttpServer()).post('/api/exercicios').set('Cookie', cookie).send({ name: 'X', muscleGroup: 'Peito', level: 'unknown', description: '', defaultSets: 0, defaultReps: '' }).expect(400);
+    const otherPersonalLogin = await login('other-personal@fitforge.app', 'personal123').expect(200);
+    const otherLibrary = await request(app.getHttpServer()).get('/api/exercicios').set('Cookie', sessionCookie(otherPersonalLogin)).expect(200);
+    const created = await request(app.getHttpServer()).post('/api/exercicios').set('Cookie', cookie).send({ name: 'Media exercise', muscleGroup: 'Peito', level: 'iniciante', description: 'Media', defaultSets: 3, defaultReps: '10' }).expect(201);
+    expect(otherLibrary.body).toEqual([]);
+    await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/media/upload`).set('Cookie', sessionCookie(otherPersonalLogin)).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(404);
+    await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/media/upload`).set('Cookie', cookie).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(503);
   });
 
   it('/api/alunos (POST) creates a safe, owned aluno and allows the new login', async () => {
