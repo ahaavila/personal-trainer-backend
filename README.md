@@ -90,6 +90,48 @@ when no valid session exists. `POST /api/auth/logout` clears the session
 cookie. The session token is not included in any JSON response and is not
 accessible to client-side JavaScript.
 
+## Dashboards
+
+Both dashboard endpoints require the HTTP-only session cookie and return `401`
+without a valid session. They also enforce the session role, returning `403` to
+an authenticated user requesting the other role's dashboard.
+
+`GET /api/dashboard/personal` is available to `personal` users and returns:
+
+```json
+{
+	"metrics": { "clientsCount": 0, "exercisesCount": 0, "trainingPlansCount": 0 },
+	"upcomingTrainings": [],
+	"weeklyEvolution": [{ "day": "day-1", "value": 0 }]
+}
+```
+
+`GET /api/dashboard/aluno` is available to `aluno` users and returns:
+
+```json
+{
+	"currentPlan": null,
+	"nextWorkouts": [],
+	"progress": { "completedWorkouts": 0, "totalWorkouts": 0 },
+	"weeklyActivity": [{ "day": "day-1", "value": 0 }]
+}
+```
+
+Weekly arrays always contain seven zero-valued entries until attendance and
+progress tracking is added. An account with no domain data receives the empty
+shapes above with `200` rather than an error.
+
+Log in and retain the session cookie before calling the endpoint appropriate to
+the account's role:
+
+```bash
+curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+	-H 'Content-Type: application/json' \
+	-d '{"email":"personal@fitforge.app","password":"personal123"}'
+
+curl -b cookies.txt http://localhost:3000/api/dashboard/personal
+```
+
 ## Scripts
 
 ```bash

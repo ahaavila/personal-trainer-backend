@@ -3,6 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { RolesGuard } from './roles.guard.js';
+import { SessionAuthGuard } from './session-auth.guard.js';
 
 type JwtExpiration = `${number}${'s' | 'm' | 'h' | 'd'}`;
 
@@ -23,6 +25,7 @@ type JwtExpiration = `${number}${'s' | 'm' | 'h' | 'd'}`;
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, SessionAuthGuard, RolesGuard],
+  exports: [AuthService, SessionAuthGuard, RolesGuard],
 })
 export class AuthModule {}

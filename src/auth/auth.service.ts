@@ -27,6 +27,12 @@ export class AuthService {
   }
 
   async getSession(token: string) {
+    const user = await this.getAuthenticatedUser(token);
+
+    return { role: user.role, name: user.name };
+  }
+
+  async getAuthenticatedUser(token: string) {
     let payload: { sub: number; role: Role };
 
     try {
@@ -39,7 +45,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { role: true, name: true },
+      select: { id: true, role: true, name: true },
     });
 
     if (!user) {
