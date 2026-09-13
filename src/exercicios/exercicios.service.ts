@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { AlunoLevel, ExerciseMediaKind } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ConfigService } from '@nestjs/config';
@@ -63,6 +63,7 @@ export class ExerciciosService {
       },
       orderBy: { name: 'asc' },
       select: {
+        id: true,
         name: true,
         muscleGroup: true,
         equipment: true,
@@ -70,6 +71,7 @@ export class ExerciciosService {
         defaultSets: true,
         defaultReps: true,
         level: true,
+        media: { select: { id: true, kind: true, contentType: true, byteSize: true } },
       },
     });
   }
@@ -165,15 +167,83 @@ export class ExerciciosService {
     if (typeof input.objectKey !== 'string' || !input.objectKey.startsWith(`exercises/${personalId}/${exercise.id}/`)) {
       throw new BadRequestException('Invalid media object key');
     }
+
+    // Replace previous media of the same kind if present
+    const existing = await this.prisma.exerciseMedia.findMany({
+      where: { exercicioId: exercise.id, kind: data.kind },
+    });
+    for (const old of existing) {
+      if (this.r2Client && this.r2Bucket) {
+        try {
+          await this.r2Client.send(new DeleteObjectCommand({ Bucket: this.r2Bucket, Key: old.objectKey }));
+        } catch {
+          // ignore S3 delete errors
+        }
+      }
+      await this.prisma.exerciseMedia.delete({ where: { id: old.id } });
+    }
+
     return this.prisma.exerciseMedia.create({
       data: { exercicioId: exercise.id, objectKey: input.objectKey, kind: data.kind, contentType: data.contentType, byteSize: data.byteSize },
-      select: { kind: true, contentType: true, byteSize: true, objectKey: true },
+      select: { id: true, kind: true, contentType: true, byteSize: true, objectKey: true },
     });
   }
 
   async media(personalId: number, exerciseId: number) {
     const exercise = await this.ownedExercise(personalId, exerciseId);
-    return this.prisma.exerciseMedia.findMany({ where: { exercicioId: exercise.id }, select: { kind: true, contentType: true, byteSize: true, objectKey: true } });
+    const mediaList = await this.prisma.exerciseMedia.findMany({
+      where: { exercicioId: exercise.id },
+      select: { id: true, kind: true, contentType: true, byteSize: true, objectKey: true },
+    });
+
+    if (!this.r2Enabled || !this.r2Client || !this.r2Bucket) {
+      return mediaList.map((m) => ({ ...m, url: null }));
+    }
+
+    return Promise.all(
+      mediaList.map(async (m) => {
+        try {
+          const url = await getSignedUrl(
+            this.r2Client!,
+            new GetObjectCommand({
+              Bucket: this.r2Bucket,
+              Key: m.objectKey,
+            }),
+            { expiresIn: 3600 },
+          );
+          return { ...m, url };
+        } catch {
+          return { ...m, url: null };
+        }
+      }),
+    );
+  }
+
+  async removeMedia(personalId: number, exerciseId: number, mediaId: number) {
+    const exercise = await this.ownedExercise(personalId, exerciseId);
+    const mediaItem = await this.prisma.exerciseMedia.findFirst({
+      where: { id: mediaId, exercicioId: exercise.id },
+    });
+    if (!mediaItem) {
+      throw new NotFoundException('Media item not found');
+    }
+
+    if (this.r2Client && this.r2Bucket) {
+      try {
+        await this.r2Client.send(new DeleteObjectCommand({
+          Bucket: this.r2Bucket,
+          Key: mediaItem.objectKey,
+        }));
+      } catch {
+        // ignore S3 delete errors
+      }
+    }
+
+    await this.prisma.exerciseMedia.delete({
+      where: { id: mediaItem.id },
+    });
+
+    return { message: 'Media removed' };
   }
 
   private async ownedExercise(personalId: number, exerciseId: number) {

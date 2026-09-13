@@ -56,4 +56,13 @@ export class ExerciciosController {
   media(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
     return this.exerciciosService.media(request.user!.id, Number(id));
   }
+
+  @Delete(':id/media/:mediaId')
+  removeMedia(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('mediaId') mediaId: string,
+  ) {
+    return this.exerciciosService.removeMedia(request.user!.id, Number(id), Number(mediaId));
+  }
 }

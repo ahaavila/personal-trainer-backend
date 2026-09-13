@@ -471,6 +471,49 @@ describe('App API (e2e)', () => {
     expect(otherResponse.body).toEqual([]);
   });
 
+  it('/api/exercicios/:id (GET/PUT/DELETE) manages an owned exercise safely', async () => {
+    const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+    const personalCookie = sessionCookie(personalLogin);
+    const created = await request(app.getHttpServer())
+      .post('/api/exercicios')
+      .set('Cookie', personalCookie)
+      .send({ name: 'Exercise lifecycle', muscleGroup: 'Peito', level: 'iniciante', description: 'Lifecycle test', defaultSets: 3, defaultReps: '10' })
+      .expect(201);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/api/exercicios/${created.body.id}`)
+      .set('Cookie', personalCookie)
+      .expect(200);
+    expect(detail.body).toMatchObject({ id: created.body.id, name: 'Exercise lifecycle', media: [] });
+
+    await request(app.getHttpServer())
+      .put(`/api/exercicios/${created.body.id}`)
+      .set('Cookie', personalCookie)
+      .send({ name: 'Updated lifecycle', muscleGroup: 'Costas', equipment: 'Cabo', level: 'intermediario', description: 'Updated description', defaultSets: 4, defaultReps: '8 a 10' })
+      .expect(200)
+      .expect((response) => expect(response.body).toMatchObject({ name: 'Updated lifecycle', muscleGroup: 'Costas', equipment: 'Cabo', level: 'intermediario', defaultSets: 4, defaultReps: '8 a 10' }));
+
+    await request(app.getHttpServer())
+      .put(`/api/exercicios/${created.body.id}`)
+      .set('Cookie', personalCookie)
+      .send({ name: 'Invalid update' })
+      .expect(400);
+
+    const otherLogin = await login('other-personal@fitforge.app', 'personal123').expect(200);
+    await request(app.getHttpServer())
+      .get(`/api/exercicios/${created.body.id}`)
+      .set('Cookie', sessionCookie(otherLogin))
+      .expect(404);
+
+    await prisma.exerciseMedia.create({ data: { exercicioId: created.body.id, kind: 'photo', objectKey: `exercises/test/${created.body.id}/photo`, contentType: 'image/jpeg', byteSize: 100 } });
+    await request(app.getHttpServer())
+      .delete(`/api/exercicios/${created.body.id}`)
+      .set('Cookie', personalCookie)
+      .expect(200);
+    await expect(prisma.exercicio.findUnique({ where: { id: created.body.id } })).resolves.toBeNull();
+    await expect(prisma.exerciseMedia.findMany({ where: { exercicioId: created.body.id } })).resolves.toEqual([]);
+  });
+
   it('/api/exercicios (POST) creates a safe owned exercise', async () => {
     const loginResponse = await login('personal@fitforge.app', 'personal123').expect(200);
     const response = await request(app.getHttpServer())
