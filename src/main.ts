@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
@@ -13,6 +15,13 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.use(cookieParser());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   app.enableCors({ origin: corsOrigins, credentials: true });
   await app.listen(configService.get<number>('PORT', 3000));
 }

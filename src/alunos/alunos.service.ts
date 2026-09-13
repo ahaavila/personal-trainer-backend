@@ -41,6 +41,7 @@ export class AlunosService {
       },
       orderBy: { name: 'asc' },
       select: {
+        id: true,
         name: true,
         email: true,
         objective: true,
@@ -60,6 +61,7 @@ export class AlunosService {
     });
 
     return alunos.map((aluno) => ({
+      id: aluno.id,
       name: aluno.name,
       email: aluno.email,
       objective: aluno.objective ?? 'não informado',
@@ -85,6 +87,7 @@ export class AlunosService {
           status: 'ativo',
         },
         select: {
+          id: true,
           name: true,
           email: true,
           objective: true,

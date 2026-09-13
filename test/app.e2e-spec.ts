@@ -64,7 +64,7 @@ describe('App API (e2e)', () => {
       },
     });
     await prisma.treinoExercicio.create({
-      data: { treinoId: workout.id, exercicioId: exercise.id, sets: 3, reps: 12 },
+      data: { treinoId: workout.id, exercicioId: exercise.id, sets: 3, reps: '12' },
     });
 
     const passwordHash = await hashPassword('empty123');
@@ -541,6 +541,105 @@ describe('App API (e2e)', () => {
     await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/upload-url`).set('Cookie', sessionCookie(otherPersonalLogin)).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(404);
     const uploadResponse = await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/upload-url`).set('Cookie', cookie).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(201);
     expect(uploadResponse.body).toMatchObject({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100, expiresIn: 300 });
+  });
+
+  it('/api/fichas-de-treino (POST) creates a valid plan for an assigned student', async () => {
+    const personalLogin = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(personalLogin);
+    const exercise = await prisma.exercicio.create({
+      data: {
+        name: 'Rosca direta',
+        muscleGroup: 'Biceps',
+        description: 'Flexão de cotovelo com barra.',
+        defaultSets: 3,
+        defaultReps: '8 a 12',
+        level: 'iniciante',
+        createdByPersonalId: (await prisma.user.findUniqueOrThrow({ where: { email: 'personal@fitforge.app' } })).id,
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/api/fichas-de-treino')
+      .set('Cookie', cookie)
+      .send({
+        alunoId: (await prisma.user.findUniqueOrThrow({ where: { email: 'aluno@fitforge.app' } })).id,
+        title: 'Plano de hipertrofia',
+        notes: 'Foco em evolução de força',
+        startDate: '2026-09-20',
+        endDate: '2026-10-20',
+        divisions: [
+          {
+            name: 'Treino A',
+            order: 1,
+            exercises: [
+              {
+                exercicioId: exercise.id,
+                order: 1,
+                sets: 4,
+                reps: '8 a 10',
+                restInterval: '90s',
+                targetLoad: '70%',
+                notes: 'Ponto de tensão',
+              },
+            ],
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      alunoId: expect.any(Number),
+      personalId: expect.any(Number),
+      title: 'Plano de hipertrofia',
+      treinos: [
+        {
+          name: 'Treino A',
+          order: 1,
+          treinoExercicios: [
+            {
+              exercicioId: exercise.id,
+              order: 1,
+              sets: 4,
+              reps: '8 a 10',
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('/api/fichas-de-treino (POST) rejects invalid payloads and unauthorized ownership', async () => {
+    const personalLogin = await login(
+      'personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    const cookie = sessionCookie(personalLogin);
+
+    await request(app.getHttpServer())
+      .post('/api/fichas-de-treino')
+      .set('Cookie', cookie)
+      .send({ alunoId: 999, title: '', divisions: [] })
+      .expect(400);
+
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .post('/api/fichas-de-treino')
+      .set('Cookie', sessionCookie(alunoLogin))
+      .send({ alunoId: 1, title: 'Plano inválido', divisions: [{ name: 'Treino A', order: 1, exercises: [{ exercicioId: 1, order: 1, sets: 3, reps: '10' }] }] })
+      .expect(403);
+
+    const otherPersonalLogin = await login(
+      'other-personal@fitforge.app',
+      'personal123',
+    ).expect(200);
+    await request(app.getHttpServer())
+      .post('/api/fichas-de-treino')
+      .set('Cookie', sessionCookie(otherPersonalLogin))
+      .send({ alunoId: (await prisma.user.findUniqueOrThrow({ where: { email: 'aluno@fitforge.app' } })).id, title: 'Plano indevido', divisions: [{ name: 'Treino A', order: 1, exercises: [{ exercicioId: 1, order: 1, sets: 3, reps: '10' }] }] })
+      .expect(403);
   });
 
   it('/api/alunos (POST) creates a safe, owned aluno and allows the new login', async () => {

@@ -15,6 +15,7 @@ export interface AlunoListingQuery {
 }
 
 export interface AlunoListingDto {
+  id: number;
   name: string;
   email: string;
   objective: AlunoObjective | 'não informado';

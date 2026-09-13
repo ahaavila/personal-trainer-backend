@@ -128,8 +128,8 @@ async function main() {
   });
   await prisma.treinoExercicio.createMany({
     data: [
-      { treinoId: treinoA.id, exercicioId: supino.id, sets: 3, reps: 12 },
-      { treinoId: treinoB.id, exercicioId: agachamento.id, sets: 4, reps: 10 },
+      { treinoId: treinoA.id, exercicioId: supino.id, sets: 3, reps: '12' },
+      { treinoId: treinoB.id, exercicioId: agachamento.id, sets: 4, reps: '10' },
     ],
   });
   await prisma.fichaDeTreino.create({
