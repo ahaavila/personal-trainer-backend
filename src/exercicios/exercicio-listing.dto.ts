@@ -16,6 +16,8 @@ export interface CreateExercicioDto {
   defaultReps?: unknown;
 }
 
+export interface UpdateExercicioDto extends CreateExercicioDto {}
+
 export interface MediaUploadDto {
   kind?: unknown;
   contentType?: unknown;

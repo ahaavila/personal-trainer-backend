@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import {
   SessionAuthGuard,
   type AuthenticatedRequest,
 } from '../auth/session-auth.guard.js';
-import type { ConfirmMediaDto, CreateExercicioDto, ExercicioListingQuery, MediaUploadDto } from './exercicio-listing.dto.js';
+import type { ConfirmMediaDto, CreateExercicioDto, ExercicioListingQuery, MediaUploadDto, UpdateExercicioDto } from './exercicio-listing.dto.js';
 import { ExerciciosService } from './exercicios.service.js';
 
 @Controller('api/exercicios')
@@ -27,12 +27,27 @@ export class ExerciciosController {
     return this.exerciciosService.create(request.user!.id, input);
   }
 
-  @Post(':id/media/upload')
+  @Get(':id')
+  findOne(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    return this.exerciciosService.findOne(request.user!.id, Number(id));
+  }
+
+  @Put(':id')
+  update(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() input: UpdateExercicioDto) {
+    return this.exerciciosService.update(request.user!.id, Number(id), input);
+  }
+
+  @Delete(':id')
+  remove(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    return this.exerciciosService.remove(request.user!.id, Number(id));
+  }
+
+  @Post(':id/upload-url')
   authorizeUpload(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() input: MediaUploadDto) {
     return this.exerciciosService.authorizeUpload(request.user!.id, Number(id), input);
   }
 
-  @Post(':id/media/confirm')
+  @Post(':id/confirm-upload')
   confirmUpload(@Req() request: AuthenticatedRequest, @Param('id') id: string, @Body() input: ConfirmMediaDto) {
     return this.exerciciosService.confirmUpload(request.user!.id, Number(id), input);
   }

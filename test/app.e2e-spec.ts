@@ -495,8 +495,9 @@ describe('App API (e2e)', () => {
     const otherLibrary = await request(app.getHttpServer()).get('/api/exercicios').set('Cookie', sessionCookie(otherPersonalLogin)).expect(200);
     const created = await request(app.getHttpServer()).post('/api/exercicios').set('Cookie', cookie).send({ name: 'Media exercise', muscleGroup: 'Peito', level: 'iniciante', description: 'Media', defaultSets: 3, defaultReps: '10' }).expect(201);
     expect(otherLibrary.body).toEqual([]);
-    await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/media/upload`).set('Cookie', sessionCookie(otherPersonalLogin)).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(404);
-    await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/media/upload`).set('Cookie', cookie).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(503);
+    await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/upload-url`).set('Cookie', sessionCookie(otherPersonalLogin)).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(404);
+    const uploadResponse = await request(app.getHttpServer()).post(`/api/exercicios/${created.body.id}/upload-url`).set('Cookie', cookie).send({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100 }).expect(201);
+    expect(uploadResponse.body).toMatchObject({ kind: 'photo', contentType: 'image/jpeg', byteSize: 100, expiresIn: 300 });
   });
 
   it('/api/alunos (POST) creates a safe, owned aluno and allows the new login', async () => {

@@ -220,9 +220,9 @@ To enable direct browser uploads, configure `R2_ENABLED=true` plus
 `R2_BUCKET_NAME` in `.env`.
 
 The media flow is: create the exercise, call
-`POST /api/exercicios/:id/media/upload` with `kind` (`photo` or `video`),
+`POST /api/exercicios/:id/upload-url` with `kind` (`photo` or `video`),
 `contentType`, and `byteSize`, upload the returned signed URL directly to R2,
-then call `POST /api/exercicios/:id/media/confirm` with the returned object key
+then call `POST /api/exercicios/:id/confirm-upload` with the returned object key
 and the same metadata. Photos are limited to 5 MB and videos to 50 MB. A
 different personal receives `404`, and disabled R2 returns `503` without
 persisting media metadata.

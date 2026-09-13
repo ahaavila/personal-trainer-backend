@@ -12,10 +12,11 @@ import type {
   ExercicioCreatedDto,
   ExercicioListingQuery,
   MediaUploadDto,
+  UpdateExercicioDto,
 } from './exercicio-listing.dto.js';
 
 const LEVELS = Object.values(AlunoLevel);
-const MEDIA_LIMITS = { photo: 5 * 1024 * 1024, video: 50 * 1024 * 1024 };
+const MEDIA_LIMITS = { photo: 10 * 1024 * 1024, video: 100 * 1024 * 1024 };
 
 @Injectable()
 export class ExerciciosService {
@@ -32,11 +33,15 @@ export class ExerciciosService {
     const accountId = config.get<string>('R2_ACCOUNT_ID', '');
     const accessKeyId = config.get<string>('R2_ACCESS_KEY_ID', '');
     const secretAccessKey = config.get<string>('R2_SECRET_ACCESS_KEY', '');
+    const endpoint = config.get<string>('R2_ENDPOINT') || (accountId ? `https://${accountId}.us.r2.cloudflarestorage.com` : '');
     if (this.r2Enabled && accountId && accessKeyId && secretAccessKey) {
       this.r2Client = new S3Client({
         region: 'auto',
-        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+        endpoint,
         credentials: { accessKeyId, secretAccessKey },
+        forcePathStyle: true,
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
       });
     }
   }
@@ -78,6 +83,60 @@ export class ExerciciosService {
     return { ...exercise, media: [] };
   }
 
+  async findOne(personalId: number, exerciseId: number): Promise<ExercicioCreatedDto> {
+    const exercise = await this.prisma.exercicio.findFirst({
+      where: { id: exerciseId, createdByPersonalId: personalId },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        equipment: true,
+        description: true,
+        defaultSets: true,
+        defaultReps: true,
+        level: true,
+        media: { select: { kind: true, contentType: true, byteSize: true } },
+      },
+    });
+
+    if (!exercise) throw new NotFoundException('Exercise not found');
+    return exercise;
+  }
+
+  async update(
+    personalId: number,
+    exerciseId: number,
+    input: UpdateExercicioDto,
+  ): Promise<ExercicioCreatedDto> {
+    await this.ownedExercise(personalId, exerciseId);
+    const data = this.validateCreateInput(input);
+    return this.prisma.exercicio.update({
+      where: { id: exerciseId },
+      data,
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        equipment: true,
+        description: true,
+        defaultSets: true,
+        defaultReps: true,
+        level: true,
+        media: { select: { kind: true, contentType: true, byteSize: true } },
+      },
+    });
+  }
+
+  async remove(personalId: number, exerciseId: number): Promise<{ message: string }> {
+    await this.ownedExercise(personalId, exerciseId);
+    await this.prisma.$transaction([
+      this.prisma.treinoExercicio.deleteMany({ where: { exercicioId: exerciseId } }),
+      this.prisma.exerciseMedia.deleteMany({ where: { exercicioId: exerciseId } }),
+      this.prisma.exercicio.delete({ where: { id: exerciseId } }),
+    ]);
+    return { message: 'Exercise deleted' };
+  }
+
   async authorizeUpload(personalId: number, exerciseId: number, input: MediaUploadDto) {
     const exercise = await this.ownedExercise(personalId, exerciseId);
     if (!this.r2Enabled || !this.r2Client || !this.r2Bucket) {
@@ -85,12 +144,17 @@ export class ExerciciosService {
     }
     const data = this.validateMediaInput(input);
     const objectKey = `exercises/${personalId}/${exercise.id}/${randomUUID()}-${data.kind}`;
-    const uploadUrl = await getSignedUrl(this.r2Client, new PutObjectCommand({
-      Bucket: this.r2Bucket,
-      Key: objectKey,
-      ContentType: data.contentType,
-      ContentLength: data.byteSize,
-    }), { expiresIn: 300 });
+    const uploadUrl = await getSignedUrl(
+      this.r2Client,
+      new PutObjectCommand({
+        Bucket: this.r2Bucket,
+        Key: objectKey,
+        ContentType: data.contentType,
+      }),
+      {
+        expiresIn: 300,
+      },
+    );
     return { uploadUrl, objectKey, expiresIn: 300, kind: data.kind, contentType: data.contentType, byteSize: data.byteSize };
   }
 
