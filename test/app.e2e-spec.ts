@@ -1,15 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
 import { hashPassword } from './../src/auth/password.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
 
 describe('App API (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -19,6 +18,13 @@ describe('App API (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -639,6 +645,83 @@ describe('App API (e2e)', () => {
       .post('/api/fichas-de-treino')
       .set('Cookie', sessionCookie(otherPersonalLogin))
       .send({ alunoId: (await prisma.user.findUniqueOrThrow({ where: { email: 'aluno@fitforge.app' } })).id, title: 'Plano indevido', divisions: [{ name: 'Treino A', order: 1, exercises: [{ exercicioId: 1, order: 1, sets: 3, reps: '10' }] }] })
+      .expect(403);
+  });
+
+  it('/api/fichas-de-treino (GET) lists owned plans with nested details', async () => {
+    const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+    const cookie = sessionCookie(personalLogin);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/fichas-de-treino?search=Ficha%20de%20hipertrofia')
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(response.body).toEqual([
+      expect.objectContaining({
+        id: expect.any(Number),
+        title: 'Ficha de hipertrofia',
+        studentId: expect.any(Number),
+        studentEmail: 'aluno@fitforge.app',
+        studentName: 'Aluno FitForge',
+        divisionsCount: 1,
+        exercisesCount: 1,
+        divisions: [
+          expect.objectContaining({
+            name: 'Treino A',
+            exercises: [
+              expect.objectContaining({
+                exerciseName: 'Supino reto',
+                muscleGroup: 'Peito',
+                sets: 3,
+                reps: '12',
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+  });
+
+  it('/api/fichas-de-treino (GET) applies alunoId and search filters', async () => {
+    const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+    const cookie = sessionCookie(personalLogin);
+    const aluno = await prisma.user.findUniqueOrThrow({ where: { email: 'aluno@fitforge.app' } });
+
+    await request(app.getHttpServer())
+      .get(`/api/fichas-de-treino?alunoId=${aluno.id}`)
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect((response) => expect(response.body.length).toBeGreaterThanOrEqual(1));
+
+    await request(app.getHttpServer())
+      .get('/api/fichas-de-treino?search=does-not-exist')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([]);
+  });
+
+  it('/api/fichas-de-treino/:id (GET) returns a plan and enforces ownership and role', async () => {
+    const plan = await prisma.fichaDeTreino.findFirstOrThrow({
+      where: { title: 'Ficha de hipertrofia' },
+    });
+    const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/fichas-de-treino/${plan.id}`)
+      .set('Cookie', sessionCookie(personalLogin))
+      .expect(200);
+
+    expect(response.body).toMatchObject({ id: plan.id, title: 'Ficha de hipertrofia' });
+
+    await request(app.getHttpServer())
+      .get(`/api/fichas-de-treino/${plan.id}`)
+      .expect(401);
+
+    const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/fichas-de-treino')
+      .set('Cookie', sessionCookie(alunoLogin))
       .expect(403);
   });
 
