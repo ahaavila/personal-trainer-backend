@@ -12,10 +12,26 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        name: true,
+        role: true,
+        status: true,
+      },
+    });
 
     if (!user || !(await comparePassword(password, user.passwordHash))) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('E-mail ou senha inválidos.');
+    }
+
+    if (user.role === 'aluno' && user.status !== 'ativo') {
+      throw new UnauthorizedException(
+        'A sua conta de aluno está inativa. Contacte o seu personal trainer.',
+      );
     }
 
     const token = await this.jwtService.signAsync({
@@ -40,16 +56,22 @@ export class AuthService {
         token,
       );
     } catch {
-      throw new UnauthorizedException('Invalid or expired session');
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
     }
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true, name: true },
+      select: { id: true, role: true, name: true, status: true },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid or expired session');
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
+    }
+
+    if (user.role === 'aluno' && user.status !== 'ativo') {
+      throw new UnauthorizedException(
+        'A sua conta de aluno está inativa. Contacte o seu personal trainer.',
+      );
     }
 
     return user;

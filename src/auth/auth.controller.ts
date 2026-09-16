@@ -38,7 +38,7 @@ export class AuthController {
       credentials.email.length === 0 ||
       credentials.password.length === 0
     ) {
-      throw new BadRequestException('Email and password are required');
+      throw new BadRequestException('E-mail e senha são obrigatórios.');
     }
 
     const { token, role, name } = await this.authService.login(
@@ -59,7 +59,7 @@ export class AuthController {
     const token = request.cookies?.[SESSION_COOKIE_NAME];
 
     if (typeof token !== 'string') {
-      throw new UnauthorizedException('Invalid or expired session');
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
     }
 
     return this.authService.getSession(token);

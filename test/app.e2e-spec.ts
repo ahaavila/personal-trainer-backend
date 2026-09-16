@@ -86,12 +86,13 @@ describe('App API (e2e)', () => {
     });
     await prisma.user.upsert({
       where: { email: 'empty-aluno@fitforge.app' },
-      update: { passwordHash, name: 'Aluno Sem Plano', role: Role.aluno, personalId: null },
+      update: { passwordHash, name: 'Aluno Sem Plano', role: Role.aluno, personalId: null, status: 'ativo' },
       create: {
         email: 'empty-aluno@fitforge.app',
         passwordHash,
         name: 'Aluno Sem Plano',
         role: Role.aluno,
+        status: 'ativo',
       },
     });
   });
@@ -141,13 +142,65 @@ describe('App API (e2e)', () => {
     expect(response.body.token).toBeUndefined();
   });
 
+  it('/api/auth/login (POST) rejects a non-active aluno before setting a session cookie', async () => {
+    try {
+      await prisma.user.update({
+        where: { email: 'aluno@fitforge.app' },
+        data: { status: 'inativo' },
+      });
+
+      const response = await login('aluno@fitforge.app', 'aluno123').expect(401);
+
+      expect(response.body).toMatchObject({
+        message: 'A sua conta de aluno está inativa. Contacte o seu personal trainer.',
+      });
+      expect(response.body.token).toBeUndefined();
+      expect(response.headers['set-cookie']).toBeUndefined();
+    } finally {
+      await prisma.user.update({
+        where: { email: 'aluno@fitforge.app' },
+        data: { status: 'ativo' },
+      });
+    }
+  });
+
+  it('/api/auth/me (GET) rejects an aluno session after deactivation', async () => {
+    try {
+      await prisma.user.update({
+        where: { email: 'aluno@fitforge.app' },
+        data: { status: 'ativo' },
+      });
+
+      const loginResponse = await login('aluno@fitforge.app', 'aluno123').expect(200);
+
+      await prisma.user.update({
+        where: { email: 'aluno@fitforge.app' },
+        data: { status: 'inativo' },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Cookie', sessionCookie(loginResponse))
+        .expect(401);
+
+      expect(response.body).toMatchObject({
+        message: 'A sua conta de aluno está inativa. Contacte o seu personal trainer.',
+      });
+    } finally {
+      await prisma.user.update({
+        where: { email: 'aluno@fitforge.app' },
+        data: { status: 'ativo' },
+      });
+    }
+  });
+
   it('/api/auth/login (POST) rejects incorrect credentials', async () => {
     const response = await login('personal@fitforge.app', 'incorrect').expect(
       401,
     );
 
     expect(response.body).toMatchObject({
-      message: 'Invalid email or password',
+      message: 'E-mail ou senha inválidos.',
     });
     expect(response.body.token).toBeUndefined();
     expect(response.headers['set-cookie']).toBeUndefined();

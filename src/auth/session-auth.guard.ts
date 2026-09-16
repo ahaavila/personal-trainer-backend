@@ -20,7 +20,7 @@ export class SessionAuthGuard implements CanActivate {
     const token = request.cookies?.session;
 
     if (typeof token !== 'string') {
-      throw new UnauthorizedException('Invalid or expired session');
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
     }
 
     request.user = await this.authService.getAuthenticatedUser(token);

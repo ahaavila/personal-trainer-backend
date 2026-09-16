@@ -36,6 +36,7 @@ async function main() {
         passwordHash: alunoPasswordHash,
         name: 'Aluno FitForge',
         role: Role.aluno,
+        status: AlunoStatus.ativo,
       },
       {
         email: 'mariana@fitforge.app',
