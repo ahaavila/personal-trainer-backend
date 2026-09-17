@@ -104,10 +104,10 @@ describe('App API (e2e)', () => {
       .expect('Hello World!');
   });
 
-  function login(email: string, password: string) {
+  function login(email: string, password: string, rememberMe?: boolean) {
     return request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email, password });
+      .send({ email, password, ...(rememberMe !== undefined ? { rememberMe } : {}) });
   }
 
   function sessionCookie(response: request.Response) {
@@ -130,6 +130,39 @@ describe('App API (e2e)', () => {
     expect(response.headers['set-cookie']?.[0]).toMatch(
       /session=.*HttpOnly.*Secure.*SameSite=Lax/,
     );
+    const setCookie = response.headers['set-cookie']?.[0];
+    const expiresMatch = setCookie!.match(/Expires=([^;]+)/);
+    expect(expiresMatch).toBeDefined();
+    const expiresDate = new Date(expiresMatch![1]);
+    const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
+    expect(diffHours).toBeGreaterThan(23);
+    expect(diffHours).toBeLessThan(25);
+  });
+
+  it('/api/auth/login (POST) sets an extended 30-day session cookie when rememberMe is true', async () => {
+    const response = await login('personal@fitforge.app', 'personal123', true).expect(200);
+
+    const setCookie = response.headers['set-cookie']?.[0];
+    expect(setCookie).toBeDefined();
+    const expiresMatch = setCookie!.match(/Expires=([^;]+)/);
+    expect(expiresMatch).toBeDefined();
+    const expiresDate = new Date(expiresMatch![1]);
+    const diffDays = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThan(29);
+    expect(diffDays).toBeLessThan(31);
+  });
+
+  it('/api/auth/login (POST) sets a standard 1-day session cookie when rememberMe is false', async () => {
+    const response = await login('personal@fitforge.app', 'personal123', false).expect(200);
+
+    const setCookie = response.headers['set-cookie']?.[0];
+    expect(setCookie).toBeDefined();
+    const expiresMatch = setCookie!.match(/Expires=([^;]+)/);
+    expect(expiresMatch).toBeDefined();
+    const expiresDate = new Date(expiresMatch![1]);
+    const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
+    expect(diffHours).toBeGreaterThan(23);
+    expect(diffHours).toBeLessThan(25);
   });
 
   it('/api/auth/login (POST) logs in the seeded aluno user', async () => {

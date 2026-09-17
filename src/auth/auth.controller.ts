@@ -41,9 +41,12 @@ export class AuthController {
       throw new BadRequestException('E-mail e senha são obrigatórios.');
     }
 
+    const rememberMe = Boolean(credentials.rememberMe);
+
     const { token, role, name } = await this.authService.login(
       credentials.email,
       credentials.password,
+      rememberMe,
     );
 
     response.cookie(SESSION_COOKIE_NAME, token, {

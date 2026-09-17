@@ -11,7 +11,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, rememberMe = false) {
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {
@@ -34,10 +34,14 @@ export class AuthService {
       );
     }
 
-    const token = await this.jwtService.signAsync({
-      sub: user.id,
-      role: user.role,
-    });
+    const expiresIn = rememberMe ? '30d' : '1d';
+    const token = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        role: user.role,
+      },
+      { expiresIn },
+    );
 
     return { token, role: user.role, name: user.name };
   }
