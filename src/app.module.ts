@@ -7,6 +7,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
 import { AlunosModule } from './alunos/alunos.module.js';
 import { ExerciciosModule } from './exercicios/exercicios.module.js';
 import { FichasModule } from './fichas/fichas.module.js';
+import { ProgressoModule } from './progresso/progresso.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { EmailModule } from './email/email.module.js';
 
@@ -20,6 +21,7 @@ import { EmailModule } from './email/email.module.js';
     AlunosModule,
     ExerciciosModule,
     FichasModule,
+    ProgressoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

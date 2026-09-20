@@ -55,6 +55,7 @@ model User {
   authoredFichas    FichaDeTreino[] @relation("AuthoredFichas")
   assignedFichas    FichaDeTreino[] @relation("AlunoFichas")
   passwordResetTokens PasswordResetToken[]
+  treinoExecucoes   TreinoExecucao[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
@@ -82,6 +83,7 @@ model Exercicio {
   createdByPersonal   User               @relation("CreatedExercises", fields: [createdByPersonalId], references: [id])
   treinoExercicios    TreinoExercicio[]
   media               ExerciseMedia[]
+  execucoes           ExercicioExecucaoLog[]
 }
 
 model ExerciseMedia {
@@ -121,6 +123,7 @@ model Treino {
   completedAt      DateTime?
   ficha            FichaDeTreino      @relation(fields: [fichaId], references: [id], onDelete: Cascade)
   treinoExercicios TreinoExercicio[]
+  execucoes        TreinoExecucao[]
 
   @@unique([fichaId, order])
 }
@@ -139,4 +142,39 @@ model TreinoExercicio {
   exercicio    Exercicio @relation(fields: [exercicioId], references: [id])
 
   @@unique([treinoId, order])
+}
+
+model TreinoExecucao {
+  id          Int                    @id @default(autoincrement())
+  alunoId     Int
+  treinoId    Int?
+  title       String
+  startedAt   DateTime
+  completedAt DateTime
+  durationMin Int?
+  notes       String?
+  aluno       User                   @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  treino      Treino?                @relation(fields: [treinoId], references: [id], onDelete: SetNull)
+  exercicios  ExercicioExecucaoLog[]
+  createdAt   DateTime               @default(now())
+
+  @@index([alunoId])
+  @@index([completedAt])
+}
+
+model ExercicioExecucaoLog {
+  id               Int            @id @default(autoincrement())
+  treinoExecucaoId Int
+  exercicioId      Int
+  order            Int            @default(1)
+  setsCompleted    Int
+  repsCompleted    String
+  maxWeightKg      Float
+  notes            String?
+  treinoExecucao   TreinoExecucao @relation(fields: [treinoExecucaoId], references: [id], onDelete: Cascade)
+  exercicio        Exercicio      @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@index([treinoExecucaoId])
+  @@index([exercicioId])
 }

@@ -117,6 +117,17 @@ async function main() {
         createdByPersonalId: personal.id,
       },
     }),
+    prisma.exercicio.create({
+      data: {
+        name: 'Puxada alta',
+        muscleGroup: 'Costas',
+        description: 'Puxada na polia alta pegada aberta.',
+        defaultSets: 3,
+        defaultReps: '10 a 12',
+        level: 'iniciante',
+        createdByPersonalId: personal.id,
+      },
+    }),
   ]);
   const ficha = await prisma.fichaDeTreino.create({
     data: { alunoId: aluno.id, personalId: personal.id, title: 'Ficha de hipertrofia' },
@@ -135,6 +146,218 @@ async function main() {
   });
   await prisma.fichaDeTreino.create({
     data: { alunoId: mariana.id, personalId: personal.id, title: 'Ficha inicial' },
+  });
+
+  // Seeds de histórico e execuções de treinos para progressão e gráficos
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  // Histórico de Aluno FitForge (progresso constante ao longo de 4 semanas)
+  const exec1 = await prisma.treinoExecucao.create({
+    data: {
+      alunoId: aluno.id,
+      treinoId: treinoA.id,
+      title: 'Treino A - Peito & Superiores',
+      startedAt: new Date(now - 28 * day),
+      completedAt: new Date(now - 28 * day + 3600000),
+      durationMin: 60,
+      notes: 'Primeira sessão, ajustando cargas iniciais.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 3,
+            repsCompleted: '12, 10, 10',
+            maxWeightKg: 50,
+            notes: 'Carga inicial moderada',
+          },
+          {
+            exercicioId: agachamento.id,
+            order: 2,
+            setsCompleted: 4,
+            repsCompleted: '10, 10, 8, 8',
+            maxWeightKg: 70,
+            notes: 'Foco na postura e amplitude',
+          },
+        ],
+      },
+    },
+  });
+
+  const exec2 = await prisma.treinoExecucao.create({
+    data: {
+      alunoId: aluno.id,
+      treinoId: treinoA.id,
+      title: 'Treino A - Peito & Superiores',
+      startedAt: new Date(now - 21 * day),
+      completedAt: new Date(now - 21 * day + 3300000),
+      durationMin: 55,
+      notes: 'Boa sensação, aumento de 5kg no supino.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 3,
+            repsCompleted: '12, 10, 9',
+            maxWeightKg: 55,
+            notes: 'Movimento controlado',
+          },
+          {
+            exercicioId: agachamento.id,
+            order: 2,
+            setsCompleted: 4,
+            repsCompleted: '10, 10, 10, 8',
+            maxWeightKg: 75,
+            notes: 'Subiu 5kg no agachamento',
+          },
+        ],
+      },
+    },
+  });
+
+  const exec3 = await prisma.treinoExecucao.create({
+    data: {
+      alunoId: aluno.id,
+      treinoId: treinoA.id,
+      title: 'Treino A - Peito & Superiores',
+      startedAt: new Date(now - 14 * day),
+      completedAt: new Date(now - 14 * day + 3480000),
+      durationMin: 58,
+      notes: 'Treino forte, mantendo boa execução.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 3,
+            repsCompleted: '10, 10, 8',
+            maxWeightKg: 60,
+            notes: 'Última série pesada mas completa',
+          },
+          {
+            exercicioId: agachamento.id,
+            order: 2,
+            setsCompleted: 4,
+            repsCompleted: '10, 8, 8, 8',
+            maxWeightKg: 80,
+            notes: 'Sentiu cansaço na lombar na última',
+          },
+        ],
+      },
+    },
+  });
+
+  const exec4 = await prisma.treinoExecucao.create({
+    data: {
+      alunoId: aluno.id,
+      treinoId: treinoA.id,
+      title: 'Treino A - Peito & Superiores',
+      startedAt: new Date(now - 7 * day),
+      completedAt: new Date(now - 7 * day + 3120000),
+      durationMin: 52,
+      notes: 'Novo recorde no supino e agachamento.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 4,
+            repsCompleted: '10, 10, 8, 6',
+            maxWeightKg: 65,
+            notes: 'Recorde pessoal (PR)!',
+          },
+          {
+            exercicioId: agachamento.id,
+            order: 2,
+            setsCompleted: 4,
+            repsCompleted: '10, 10, 8, 8',
+            maxWeightKg: 85,
+            notes: 'Execução muito sólida',
+          },
+        ],
+      },
+    },
+  });
+
+  const exec5 = await prisma.treinoExecucao.create({
+    data: {
+      alunoId: aluno.id,
+      treinoId: treinoA.id,
+      title: 'Treino A - Peito & Superiores',
+      startedAt: new Date(now - 1 * day),
+      completedAt: new Date(now - 1 * day + 3300000),
+      durationMin: 55,
+      notes: 'Consolidando a carga máxima de 67.5kg no supino e 90kg no agachamento.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 4,
+            repsCompleted: '10, 8, 8, 6',
+            maxWeightKg: 67.5,
+            notes: 'Ótimo controle excêntrico',
+          },
+          {
+            exercicioId: agachamento.id,
+            order: 2,
+            setsCompleted: 4,
+            repsCompleted: '8, 8, 8, 6',
+            maxWeightKg: 90,
+            notes: 'Rompeu a barreira dos 90kg',
+          },
+        ],
+      },
+    },
+  });
+
+  // Histórico de Mariana Costa (emagrecimento e condicionamento)
+  await prisma.treinoExecucao.create({
+    data: {
+      alunoId: mariana.id,
+      title: 'Adaptação e Circuito Geral',
+      startedAt: new Date(now - 10 * day),
+      completedAt: new Date(now - 10 * day + 2700000),
+      durationMin: 45,
+      notes: 'Adaptação inicial de movimentos.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 3,
+            repsCompleted: '15, 12, 12',
+            maxWeightKg: 20,
+            notes: 'Barra leve',
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.treinoExecucao.create({
+    data: {
+      alunoId: mariana.id,
+      title: 'Treino Funcional e Força',
+      startedAt: new Date(now - 3 * day),
+      completedAt: new Date(now - 3 * day + 3000000),
+      durationMin: 50,
+      notes: 'Aumentou a resistência e repetições.',
+      exercicios: {
+        create: [
+          {
+            exercicioId: supino.id,
+            order: 1,
+            setsCompleted: 3,
+            repsCompleted: '15, 15, 12',
+            maxWeightKg: 25,
+            notes: 'Progressão de 5kg com facilidade',
+          },
+        ],
+      },
+    },
   });
 }
 
