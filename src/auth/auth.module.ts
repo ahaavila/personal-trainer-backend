@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { EmailModule } from '../email/email.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { RolesGuard } from './roles.guard.js';
@@ -10,6 +11,7 @@ type JwtExpiration = `${number}${'s' | 'm' | 'h' | 'd'}`;
 
 @Module({
   imports: [
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -12,7 +12,9 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
+import { ForgotPasswordDto } from './forgot-password.dto.js';
 import type { LoginDto } from './login.dto.js';
+import { ResetPasswordDto } from './reset-password.dto.js';
 
 const SESSION_COOKIE_NAME = 'session';
 const SESSION_COOKIE_OPTIONS = {
@@ -73,5 +75,18 @@ export class AuthController {
   logout(@Res({ passthrough: true }) response: Response) {
     response.clearCookie(SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS);
     return { message: 'Logged out' };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    const result = await this.authService.forgotPassword(body.email);
+    return { message: result.message };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.password);
   }
 }

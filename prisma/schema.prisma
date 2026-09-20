@@ -54,8 +54,19 @@ model User {
   createdExercises  Exercicio[]     @relation("CreatedExercises")
   authoredFichas    FichaDeTreino[] @relation("AuthoredFichas")
   assignedFichas    FichaDeTreino[] @relation("AlunoFichas")
+  passwordResetTokens PasswordResetToken[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Exercicio {

@@ -1,14 +1,21 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { comparePassword } from './password.js';
+import { EmailService } from '../email/email.service.js';
+import { comparePassword, hashPassword } from './password.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async login(email: string, password: string, rememberMe = false) {
@@ -94,5 +101,119 @@ export class AuthService {
     }
 
     return new Date(payload.exp * 1000);
+  }
+
+  hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  async createPasswordResetToken(
+    userId: number,
+  ): Promise<{ rawToken: string; expiresAt: Date }> {
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    return { rawToken, expiresAt };
+  }
+
+  async forgotPassword(
+    email: string,
+  ): Promise<{ message: string; rawToken?: string }> {
+    const genericResponse = {
+      message:
+        'Se o e-mail estiver registado, enviámos instruções para redefinir a sua senha.',
+    };
+
+    if (typeof email !== 'string' || !email.trim()) {
+      return genericResponse;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+    });
+
+    if (!user) {
+      return genericResponse;
+    }
+
+    const { rawToken } = await this.createPasswordResetToken(user.id);
+
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      user.name,
+      rawToken,
+    );
+
+    return {
+      ...genericResponse,
+      rawToken,
+    };
+  }
+
+  async verifyResetToken(token: string) {
+    if (!token || typeof token !== 'string') {
+      throw new BadRequestException('Token de recuperação inválido ou expirado.');
+    }
+
+    const tokenHash = this.hashToken(token);
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Token de recuperação inválido ou expirado.');
+    }
+
+    if (record.usedAt !== null) {
+      throw new BadRequestException('Token de recuperação já utilizado.');
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new BadRequestException('Token de recuperação expirado.');
+    }
+
+    return record;
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      throw new BadRequestException(
+        'A senha deve ter no mínimo 6 caracteres.',
+      );
+    }
+
+    const tokenRecord = await this.verifyResetToken(token);
+    const passwordHash = await hashPassword(newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: tokenRecord.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: tokenRecord.userId, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Senha redefinida com sucesso.' };
   }
 }
