@@ -1,14 +1,16 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AlunoLevel, AlunoObjective, Role } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EmailService } from '../email/email.service.js';
 import { comparePassword, hashPassword } from './password.js';
+import type { UpdateProfileDto } from './update-profile.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -215,5 +217,131 @@ export class AuthService {
     ]);
 
     return { message: 'Senha redefinida com sucesso.' };
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        objective: true,
+        level: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilizador não encontrado.');
+    }
+
+    if (user.role === 'aluno') {
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl ?? null,
+        objective: user.objective ?? 'não informado',
+        level: user.level ?? 'não informado',
+        status: user.status ?? 'ativo',
+      };
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatarUrl ?? null,
+    };
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilizador não encontrado.');
+    }
+
+    const data: {
+      name?: string;
+      avatarUrl?: string | null;
+      objective?: AlunoObjective;
+      level?: AlunoLevel;
+    } = {};
+
+    if (dto.name !== undefined) {
+      const trimmed = typeof dto.name === 'string' ? dto.name.trim() : '';
+      if (trimmed.length < 2) {
+        throw new BadRequestException('O nome deve ter no mínimo 2 caracteres.');
+      }
+      data.name = trimmed;
+    }
+
+    if (dto.avatarUrl !== undefined) {
+      data.avatarUrl = dto.avatarUrl;
+    }
+
+    if (user.role === 'aluno') {
+      if (dto.objective !== undefined) {
+        data.objective = dto.objective;
+      }
+      if (dto.level !== undefined) {
+        data.level = dto.level;
+      }
+    }
+
+    if (Object.keys(data).length > 0) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data,
+      });
+    }
+
+    return this.getProfile(userId);
+  }
+
+  async changePassword(
+    userId: number,
+    currentPassword?: string,
+    newPassword?: string,
+  ): Promise<{ message: string }> {
+    if (!currentPassword || typeof currentPassword !== 'string') {
+      throw new BadRequestException('A senha atual é obrigatória.');
+    }
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+      throw new BadRequestException('A nova senha deve ter no mínimo 6 caracteres.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilizador não encontrado.');
+    }
+
+    const isValid = await comparePassword(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestException('A senha atual está incorreta.');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { message: 'Senha alterada com sucesso.' };
   }
 }

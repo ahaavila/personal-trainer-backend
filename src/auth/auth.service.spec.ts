@@ -22,7 +22,9 @@ describe('AuthService', () => {
     passwordHash: string;
     name: string;
     role: 'personal' | 'aluno';
-    status: null;
+    objective?: any;
+    level?: any;
+    status: any;
   }>;
 
   beforeAll(async () => {
@@ -37,10 +39,10 @@ describe('AuthService', () => {
         );
         return Promise.resolve(user ? { ...user } : null);
       },
-      update: (args: { where: { id: number }; data: { passwordHash: string } }) => {
+      update: (args: { where: { id: number }; data: any }) => {
         const user = users.find((u) => u.id === args.where.id);
         if (user) {
-          user.passwordHash = args.data.passwordHash;
+          Object.assign(user, args.data);
         }
         return Promise.resolve(user);
       },
@@ -244,6 +246,107 @@ describe('AuthService', () => {
       await expect(service.resetPassword(rawToken, 'anotherPass123')).rejects.toThrow(
         'Token de recuperação já utilizado.',
       );
+    });
+  });
+
+  describe('getProfile', () => {
+    it('returns personal profile with id, name, email, and role', async () => {
+      const profile = await service.getProfile(1);
+      expect(profile).toEqual({
+        id: 1,
+        name: 'User FitForge',
+        email: 'user@fitforge.app',
+        role: 'personal',
+        avatarUrl: null,
+      });
+    });
+
+    it('returns student profile including objective, level, and status', async () => {
+      users.push({
+        id: 2,
+        email: 'student@fitforge.app',
+        passwordHash,
+        name: 'Student FitForge',
+        role: 'aluno',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+        status: 'ativo',
+      });
+
+      const profile = await service.getProfile(2);
+      expect(profile).toEqual({
+        id: 2,
+        name: 'Student FitForge',
+        email: 'student@fitforge.app',
+        role: 'aluno',
+        avatarUrl: null,
+        objective: 'hipertrofia',
+        level: 'iniciante',
+        status: 'ativo',
+      });
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('updates name for personal trainer', async () => {
+      const updated = await service.updateProfile(1, { name: 'Novo Nome Personal' });
+      expect(updated.name).toBe('Novo Nome Personal');
+    });
+
+    it('updates name, objective, and level for student', async () => {
+      users.push({
+        id: 3,
+        email: 'student2@fitforge.app',
+        passwordHash,
+        name: 'Student Two',
+        role: 'aluno',
+        objective: 'emagrecimento',
+        level: 'iniciante',
+        status: 'ativo',
+      });
+
+      const updated = await service.updateProfile(3, {
+        name: 'Student Updated',
+        objective: 'hipertrofia' as any,
+        level: 'avancado' as any,
+      });
+
+      expect(updated).toMatchObject({
+        id: 3,
+        name: 'Student Updated',
+        objective: 'hipertrofia',
+        level: 'avancado',
+      });
+    });
+
+    it('rejects update with name shorter than 2 characters', async () => {
+      await expect(service.updateProfile(1, { name: 'A' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('changePassword', () => {
+    it('successfully changes password when current password is correct', async () => {
+      const res = await service.changePassword(1, 'secret123', 'newSecret456');
+      expect(res.message).toBe('Senha alterada com sucesso.');
+
+      const user = users.find((u) => u.id === 1)!;
+      await expect(
+        comparePassword('newSecret456', user.passwordHash),
+      ).resolves.toBe(true);
+    });
+
+    it('rejects password change when current password is wrong', async () => {
+      await expect(
+        service.changePassword(1, 'wrongPassword', 'newSecret456'),
+      ).rejects.toThrow('A senha atual está incorreta.');
+    });
+
+    it('rejects password change when new password is fewer than 6 characters', async () => {
+      await expect(
+        service.changePassword(1, 'secret123', '12345'),
+      ).rejects.toThrow('A nova senha deve ter no mínimo 6 caracteres.');
     });
   });
 });

@@ -5,16 +5,21 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { ForgotPasswordDto } from './forgot-password.dto.js';
 import type { LoginDto } from './login.dto.js';
 import { ResetPasswordDto } from './reset-password.dto.js';
+import { SessionAuthGuard, type AuthenticatedRequest } from './session-auth.guard.js';
+import { UpdateProfileDto } from './update-profile.dto.js';
+import { ChangePasswordDto } from './change-password.dto.js';
 
 const SESSION_COOKIE_NAME = 'session';
 const SESSION_COOKIE_OPTIONS = {
@@ -88,5 +93,34 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body.token, body.password);
+  }
+
+  @Get('profile')
+  @UseGuards(SessionAuthGuard)
+  async getProfile(@Req() request: AuthenticatedRequest) {
+    return this.authService.getProfile(request.user!.id);
+  }
+
+  @Patch('profile')
+  @UseGuards(SessionAuthGuard)
+  async updateProfile(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(request.user!.id, body);
+  }
+
+  @Post('change-password')
+  @UseGuards(SessionAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(
+      request.user!.id,
+      body.currentPassword,
+      body.newPassword,
+    );
   }
 }

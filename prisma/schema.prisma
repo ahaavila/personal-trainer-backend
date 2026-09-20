@@ -45,6 +45,7 @@ model User {
   passwordHash      String
   name              String
   role              Role
+  avatarUrl         String?
   personalId        Int?
   objective         AlunoObjective?
   level             AlunoLevel?

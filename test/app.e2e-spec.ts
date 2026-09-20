@@ -423,7 +423,7 @@ describe('App API (e2e)', () => {
           email: 'aluno@fitforge.app',
           objective: 'não informado',
           level: 'não informado',
-          status: 'não informado',
+          status: 'ativo',
           latestWorkout: {
             name: 'Treino A',
             completedAt: '2026-09-08T10:00:00.000Z',
@@ -514,6 +514,7 @@ describe('App API (e2e)', () => {
 
     expect(response.body).toEqual([
       {
+        id: expect.any(Number),
         name: 'Supino reto',
         muscleGroup: 'Peito',
         equipment: null,
@@ -521,6 +522,7 @@ describe('App API (e2e)', () => {
         defaultSets: 3,
         defaultReps: '8 a 12',
         level: 'intermediario',
+        media: [],
       },
     ]);
   });
@@ -831,6 +833,7 @@ describe('App API (e2e)', () => {
       .expect(201);
 
     expect(response.body).toEqual({
+      id: expect.any(Number),
       name: 'Novo Aluno',
       email,
       objective: 'hipertrofia',
