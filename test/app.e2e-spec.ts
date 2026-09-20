@@ -806,10 +806,33 @@ describe('App API (e2e)', () => {
       .get(`/api/fichas-de-treino/${plan.id}`)
       .expect(401);
 
+    // Aluno assigned to the plan can retrieve plans list and plan details
     const alunoLogin = await login('aluno@fitforge.app', 'aluno123').expect(200);
-    await request(app.getHttpServer())
+    const alunoCookie = sessionCookie(alunoLogin);
+    const alunoListRes = await request(app.getHttpServer())
       .get('/api/fichas-de-treino')
-      .set('Cookie', sessionCookie(alunoLogin))
+      .set('Cookie', alunoCookie)
+      .expect(200);
+    expect(alunoListRes.body.length).toBeGreaterThanOrEqual(1);
+    expect(alunoListRes.body.some((f: { id: number }) => f.id === plan.id)).toBe(true);
+
+    const alunoDetailRes = await request(app.getHttpServer())
+      .get(`/api/fichas-de-treino/${plan.id}`)
+      .set('Cookie', alunoCookie)
+      .expect(200);
+    expect(alunoDetailRes.body).toMatchObject({ id: plan.id, title: 'Ficha de hipertrofia' });
+
+    // Another aluno cannot access this plan
+    const otherAlunoLogin = await login('mariana@fitforge.app', 'aluno123').expect(200);
+    await request(app.getHttpServer())
+      .get(`/api/fichas-de-treino/${plan.id}`)
+      .set('Cookie', sessionCookie(otherAlunoLogin))
+      .expect(404);
+
+    // Aluno cannot mutate plans
+    await request(app.getHttpServer())
+      .delete(`/api/fichas-de-treino/${plan.id}`)
+      .set('Cookie', alunoCookie)
       .expect(403);
   });
 

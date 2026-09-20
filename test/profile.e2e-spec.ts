@@ -68,6 +68,7 @@ describe('Auth Profile & Change Password (e2e)', () => {
         name: 'Personal FitForge',
         email: 'personal@fitforge.app',
         role: 'personal',
+        avatarUrl: null,
       });
     });
 
@@ -85,6 +86,7 @@ describe('Auth Profile & Change Password (e2e)', () => {
         name: 'Mariana Costa',
         email: 'mariana@fitforge.app',
         role: 'aluno',
+        avatarUrl: null,
         objective: 'emagrecimento',
         level: 'iniciante',
         status: 'ativo',

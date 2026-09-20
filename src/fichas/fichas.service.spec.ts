@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { EmailService } from '../email/email.service.js';
 import { FichasService } from './fichas.service.js';
 
 // Mock factory functions that don't use jest at module load time
@@ -14,6 +15,7 @@ const createMockPrismaService = () => ({
   fichaDeTreino: createMockFichaDeTreino(),
   user: {
     findFirst: () => Promise.resolve(null),
+    findUnique: () => Promise.resolve(null),
   },
   exercicio: {
     findMany: () => Promise.resolve([]),
@@ -33,6 +35,12 @@ describe('FichasService', () => {
           provide: PrismaService,
           useValue: createMockPrismaService(),
         },
+        {
+          provide: EmailService,
+          useValue: {
+            sendWorkoutRequestNotificationEmail: async () => Promise.resolve(),
+          },
+        },
       ],
     }).compile();
 
@@ -41,8 +49,8 @@ describe('FichasService', () => {
   });
 
   describe('list', () => {
-    it('should return all training plans when no filters provided', async () => {
-      const personalId = 1;
+    it('should return all training plans when no filters provided for personal', async () => {
+      const user = { id: 1, role: 'personal' as const };
       const mockData = [
         {
           id: 1,
@@ -73,7 +81,7 @@ describe('FichasService', () => {
 
       (prisma.fichaDeTreino.findMany as any) = async () => mockData;
 
-      const result = await service.list(personalId, {});
+      const result = await service.list(user, {});
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(1);
@@ -81,8 +89,23 @@ describe('FichasService', () => {
       expect(result[0].exercisesCount).toBe(2);
     });
 
-    it('should filter by alunoId when provided', async () => {
-      const personalId = 1;
+    it('should return training plans assigned to student when user is aluno', async () => {
+      const user = { id: 2, role: 'aluno' as const };
+      let capturedQuery: any;
+
+      (prisma.fichaDeTreino.findMany as any) = async (query: any) => {
+        capturedQuery = query;
+        return [];
+      };
+
+      await service.list(user, {});
+
+      expect(capturedQuery?.where?.alunoId).toBe(2);
+      expect(capturedQuery?.where?.personalId).toBeUndefined();
+    });
+
+    it('should filter by alunoId when provided for personal', async () => {
+      const user = { id: 1, role: 'personal' as const };
       const alunoId = 2;
       let capturedQuery: any;
 
@@ -91,14 +114,14 @@ describe('FichasService', () => {
         return [];
       };
 
-      await service.list(personalId, { alunoId });
+      await service.list(user, { alunoId });
 
-      expect(capturedQuery?.where?.personalId).toBe(personalId);
+      expect(capturedQuery?.where?.personalId).toBe(user.id);
       expect(capturedQuery?.where?.alunoId).toBe(alunoId);
     });
 
     it('should filter by search term', async () => {
-      const personalId = 1;
+      const user = { id: 1, role: 'personal' as const };
       let searchCalled = false;
 
       (prisma.fichaDeTreino.findMany as any) = async () => {
@@ -106,13 +129,13 @@ describe('FichasService', () => {
         return [];
       };
 
-      await service.list(personalId, { search: 'test' });
+      await service.list(user, { search: 'test' });
 
       expect(searchCalled).toBe(true);
     });
 
     it('should calculate metrics correctly', async () => {
-      const personalId = 1;
+      const user = { id: 1, role: 'personal' as const };
       const mockData = [
         {
           id: 1,
@@ -150,7 +173,7 @@ describe('FichasService', () => {
 
       (prisma.fichaDeTreino.findMany as any) = async () => mockData;
 
-      const result = await service.list(personalId, {});
+      const result = await service.list(user, {});
 
       expect(result[0].divisionsCount).toBe(2);
       expect(result[0].exercisesCount).toBe(3);
@@ -158,8 +181,8 @@ describe('FichasService', () => {
   });
 
   describe('findById', () => {
-    it('should return a training plan when found', async () => {
-      const personalId = 1;
+    it('should return a training plan when found for personal', async () => {
+      const user = { id: 1, role: 'personal' as const };
       const fichaId = 1;
       const mockData = {
         id: fichaId,
@@ -189,24 +212,52 @@ describe('FichasService', () => {
 
       (prisma.fichaDeTreino.findFirst as any) = async () => mockData;
 
-      const result = await service.findById(personalId, fichaId);
+      const result = await service.findById(user, fichaId);
 
       expect(result.id).toBe(fichaId);
       expect(result.title).toBe('Hypertrophy');
       expect(result.studentName).toBe('Student A');
     });
 
+    it('should return a training plan when found for assigned student', async () => {
+      const user = { id: 2, role: 'aluno' as const };
+      const fichaId = 1;
+      let capturedQuery: any;
+
+      (prisma.fichaDeTreino.findFirst as any) = async (query: any) => {
+        capturedQuery = query;
+        return {
+          id: fichaId,
+          title: 'Plan',
+          notes: null,
+          startDate: null,
+          endDate: null,
+          createdAt: new Date(),
+          alunoId: 2,
+          aluno: { id: 2, name: 'S', email: 'e@t.com', objective: 'f' },
+          treinos: [],
+        };
+      };
+
+      const result = await service.findById(user, fichaId);
+
+      expect(capturedQuery?.where?.id).toBe(fichaId);
+      expect(capturedQuery?.where?.alunoId).toBe(2);
+      expect(capturedQuery?.where?.personalId).toBeUndefined();
+      expect(result.id).toBe(fichaId);
+    });
+
     it('should throw NotFoundException when plan not found', async () => {
-      const personalId = 1;
+      const user = { id: 1, role: 'personal' as const };
       const fichaId = 999;
 
       (prisma.fichaDeTreino.findFirst as any) = async () => null;
 
-      await expect(service.findById(personalId, fichaId)).rejects.toThrow(NotFoundException);
+      await expect(service.findById(user, fichaId)).rejects.toThrow(NotFoundException);
     });
 
-    it('should verify ownership via findFirst where clause', async () => {
-      const personalId = 1;
+    it('should verify ownership via findFirst where clause for personal', async () => {
+      const user = { id: 1, role: 'personal' as const };
       const fichaId = 1;
       let capturedQuery: any;
 
@@ -215,14 +266,31 @@ describe('FichasService', () => {
         return null;
       };
 
-      await expect(service.findById(personalId, fichaId)).rejects.toThrow(NotFoundException);
+      await expect(service.findById(user, fichaId)).rejects.toThrow(NotFoundException);
 
-      expect(capturedQuery?.where?.personalId).toBe(personalId);
+      expect(capturedQuery?.where?.personalId).toBe(user.id);
       expect(capturedQuery?.where?.id).toBe(fichaId);
     });
 
+    it('should verify ownership via findFirst where clause for aluno', async () => {
+      const user = { id: 2, role: 'aluno' as const };
+      const fichaId = 1;
+      let capturedQuery: any;
+
+      (prisma.fichaDeTreino.findFirst as any) = async (query: any) => {
+        capturedQuery = query;
+        return null;
+      };
+
+      await expect(service.findById(user, fichaId)).rejects.toThrow(NotFoundException);
+
+      expect(capturedQuery?.where?.alunoId).toBe(user.id);
+      expect(capturedQuery?.where?.id).toBe(fichaId);
+      expect(capturedQuery?.where?.personalId).toBeUndefined();
+    });
+
     it('should map nested relations correctly', async () => {
-      const personalId = 1;
+      const user = { id: 1, role: 'personal' as const };
       const fichaId = 1;
       const mockData = {
         id: fichaId,
@@ -264,7 +332,7 @@ describe('FichasService', () => {
 
       (prisma.fichaDeTreino.findFirst as any) = async () => mockData;
 
-      const result = await service.findById(personalId, fichaId);
+      const result = await service.findById(user, fichaId);
 
       expect(result.divisions).toHaveLength(1);
       expect(result.divisions[0].exercises).toHaveLength(1);

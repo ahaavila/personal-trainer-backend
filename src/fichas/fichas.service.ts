@@ -5,12 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { EmailService } from '../email/email.service.js';
 import type { CreateFichaDto } from './dto/create-ficha.dto.js';
 import type { FichaListingDto, ListFichasQueryDto } from './dto/list-fichas.dto.js';
 
 @Injectable()
 export class FichasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async create(personalId: number, input: CreateFichaDto) {
     if (!input.divisions || input.divisions.length === 0) {
@@ -83,13 +87,20 @@ export class FichasService {
   }
 
   async list(
-    personalId: number,
+    user: { id: number; role: 'personal' | 'aluno' },
     query: ListFichasQueryDto,
   ): Promise<FichaListingDto[]> {
+    const whereCondition =
+      user.role === 'aluno'
+        ? { alunoId: user.id }
+        : {
+            personalId: user.id,
+            ...(query.alunoId ? { alunoId: query.alunoId } : {}),
+          };
+
     const fichas = await this.prisma.fichaDeTreino.findMany({
       where: {
-        personalId,
-        ...(query.alunoId ? { alunoId: query.alunoId } : {}),
+        ...whereCondition,
         ...(query.search
           ? {
               OR: [
@@ -170,12 +181,15 @@ export class FichasService {
     });
   }
 
-  async findById(personalId: number, id: number): Promise<FichaListingDto> {
+  async findById(
+    user: { id: number; role: 'personal' | 'aluno' },
+    id: number,
+  ): Promise<FichaListingDto> {
+    const whereCondition =
+      user.role === 'aluno' ? { id, alunoId: user.id } : { id, personalId: user.id };
+
     const ficha = await this.prisma.fichaDeTreino.findFirst({
-      where: {
-        id,
-        personalId,
-      },
+      where: whereCondition,
       include: {
         aluno: {
           select: { id: true, name: true, email: true, objective: true },
@@ -333,7 +347,7 @@ export class FichasService {
       });
     });
 
-    return this.findById(personalId, id);
+    return this.findById({ id: personalId, role: 'personal' }, id);
   }
 
   async delete(personalId: number, id: number): Promise<void> {
@@ -349,5 +363,34 @@ export class FichasService {
     await this.prisma.fichaDeTreino.delete({
       where: { id },
     });
+  }
+
+  async requestActivation(alunoId: number): Promise<{ message: string }> {
+    const aluno = await this.prisma.user.findUnique({
+      where: { id: alunoId },
+      include: {
+        personal: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!aluno || aluno.role !== 'aluno') {
+      throw new NotFoundException('Aluno não encontrado.');
+    }
+
+    if (!aluno.personal) {
+      throw new BadRequestException('Não tem nenhum personal trainer associado à sua conta.');
+    }
+
+    await this.emailService.sendWorkoutRequestNotificationEmail(
+      aluno.personal.email,
+      aluno.personal.name,
+      aluno.name,
+    );
+
+    return {
+      message: 'O seu Personal Trainer foi notificado por e-mail para disponibilizar uma nova ficha de treino.',
+    };
   }
 }

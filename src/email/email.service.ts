@@ -166,4 +166,65 @@ export class EmailService {
       );
     }
   }
+
+  async sendWorkoutRequestNotificationEmail(
+    to: string,
+    personalName: string,
+    studentName: string,
+  ): Promise<void> {
+    const actionUrl = `${this.frontendUrl.replace(/\/$/, '')}/nova-ficha-de-treino`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0c0a08; color: #f2ede4; padding: 32px; border-radius: 8px;">
+        <div style="border-bottom: 2px solid #e2a83e; padding-bottom: 16px; margin-bottom: 24px;">
+          <h1 style="color: #e2a83e; font-size: 24px; margin: 0; letter-spacing: 2px;">FITFORGE</h1>
+        </div>
+        <h2 style="font-size: 20px; margin-top: 0;">Novo Treino Solicitado</h2>
+        <p style="color: #cbbfa3; font-size: 16px; line-height: 1.5;">Olá, ${personalName || 'Personal'}.</p>
+        <p style="color: #cbbfa3; font-size: 16px; line-height: 1.5;">
+          O seu aluno <strong>${studentName}</strong> está atualmente sem nenhuma ficha de treino ativa e solicitou a criação de uma nova rotina de treinos.
+        </p>
+        <div style="margin: 32px 0; text-align: center;">
+          <a href="${actionUrl}" style="background: linear-gradient(90deg, #f2c265, #e2a83e); color: #1a1408; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 6px; display: inline-block; font-size: 16px;">
+            Criar Nova Ficha de Treino
+          </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #232019; margin: 32px 0;" />
+        <p style="color: #6f6a5f; font-size: 12px; margin: 0;">
+          FitForge - Acompanhamento e alta performance.
+        </p>
+      </div>
+    `;
+
+    if (!this.resend) {
+      this.logger.log(
+        `[MOCK EMAIL] To: ${to} | Subject: Solicitação de Treino - ${studentName} | URL: ${actionUrl}`,
+      );
+      return;
+    }
+
+    try {
+      const response = await this.resend.emails.send({
+        from: this.defaultFrom,
+        to,
+        subject: `FitForge - ${studentName} solicitou uma nova ficha de treino`,
+        html,
+      });
+
+      if (response.error) {
+        this.logger.error(
+          `Failed to send workout request notification email to ${to}: ${response.error.message}`,
+        );
+      } else {
+        this.logger.log(
+          `Workout request notification email sent successfully to ${to} (ID: ${response.data?.id})`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Exception occurred while sending workout request notification email to ${to}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
 }

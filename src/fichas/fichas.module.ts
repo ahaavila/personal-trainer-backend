@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
+import { EmailModule } from '../email/email.module.js';
 import { FichasController } from './fichas.controller.js';
 import { FichasService } from './fichas.service.js';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, EmailModule],
   controllers: [FichasController],
   providers: [FichasService],
 })
