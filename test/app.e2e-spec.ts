@@ -825,7 +825,6 @@ describe('App API (e2e)', () => {
       .send({
         name: 'Novo Aluno',
         email,
-        password: 'temporary123',
         objective: 'hipertrofia',
         level: 'iniciante',
       })
@@ -847,8 +846,12 @@ describe('App API (e2e)', () => {
       .expect(200);
     expect(listing.body).toEqual([response.body]);
 
-    const createdLogin = await login(email, 'temporary123').expect(200);
-    expect(createdLogin.body).toMatchObject({ role: 'aluno', name: 'Novo Aluno' });
+    const createdUser = await prisma.user.findUnique({ where: { email } });
+    expect(createdUser).toBeDefined();
+    const tokenRecord = await prisma.passwordResetToken.findFirst({
+      where: { userId: createdUser!.id, usedAt: null },
+    });
+    expect(tokenRecord).toBeDefined();
   });
 
   it('/api/alunos (POST) rejects unauthorized, invalid, and duplicate creation', async () => {
@@ -864,7 +867,6 @@ describe('App API (e2e)', () => {
       .send({
         name: 'Forbidden',
         email: 'forbidden@fitforge.app',
-        password: 'temporary123',
         objective: 'hipertrofia',
         level: 'iniciante',
       })
@@ -878,7 +880,18 @@ describe('App API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/alunos')
       .set('Cookie', cookie)
-      .send({ name: 'A', email: 'invalid', password: 'short' })
+      .send({ name: 'A', email: 'invalid' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/api/alunos')
+      .set('Cookie', cookie)
+      .send({
+        name: 'With Password',
+        email: `withpass-${Date.now()}@fitforge.app`,
+        password: 'temporary123',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+      })
       .expect(400);
     await request(app.getHttpServer())
       .post('/api/alunos')
@@ -886,7 +899,6 @@ describe('App API (e2e)', () => {
       .send({
         name: 'Duplicate',
         email: 'aluno@fitforge.app',
-        password: 'temporary123',
         objective: 'hipertrofia',
         level: 'iniciante',
       })

@@ -1,10 +1,4 @@
-# student-creation-data Specification
-
-## Purpose
-
-Provides a secure personal-only API that creates aluno accounts and automatically assigns them to the authenticated personal.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Personal can create an assigned aluno
 The system SHALL provide an authenticated personal-only endpoint that creates an aluno with name, email, objective, and level without requiring a temporary password, assigns the aluno to the requesting personal, generates a secure password setup token, and dispatches an invitation email to the aluno.
@@ -27,10 +21,3 @@ The system SHALL reject missing or invalid creation inputs and duplicate email a
 #### Scenario: Invalid creation request
 - **WHEN** the submitted name, email, objective, or level is missing or invalid
 - **THEN** the API responds with a validation error and creates no account
-
-### Requirement: Passwords remain protected
-The system SHALL hash the temporary password before storing it and SHALL not return it or its hash in the response.
-
-#### Scenario: Inspecting creation response
-- **WHEN** aluno creation succeeds
-- **THEN** the response contains no plaintext password, password hash, JWT, or session cookie value

@@ -21,6 +21,6 @@ export class AlunosController {
 
   @Post()
   create(@Req() request: AuthenticatedRequest, @Body() input: CreateAlunoDto) {
-    return this.alunosService.create(request.user!.id, input);
+    return this.alunosService.create(request.user!.id, input, request.user?.name);
   }
 }

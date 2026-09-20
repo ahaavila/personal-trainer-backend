@@ -94,4 +94,76 @@ export class EmailService {
       );
     }
   }
+
+  async sendStudentInviteEmail(
+    to: string,
+    studentName: string,
+    personalName: string,
+    token: string,
+  ): Promise<void> {
+    const setupUrl = `${this.frontendUrl.replace(/\/$/, '')}/redefinir-senha?token=${token}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0c0a08; color: #f2ede4; padding: 32px; border-radius: 8px;">
+        <div style="border-bottom: 2px solid #e2a83e; padding-bottom: 16px; margin-bottom: 24px;">
+          <h1 style="color: #e2a83e; font-size: 24px; margin: 0; letter-spacing: 2px;">FITFORGE</h1>
+        </div>
+        <h2 style="font-size: 20px; margin-top: 0;">Bem-vindo ao FitForge!</h2>
+        <p style="color: #cbbfa3; font-size: 16px; line-height: 1.5;">Olá, ${studentName || 'Aluno'}.</p>
+        <p style="color: #cbbfa3; font-size: 16px; line-height: 1.5;">
+          O seu Personal Trainer ${personalName ? `<strong>${personalName}</strong> ` : ''}criou a sua conta no FitForge para acompanhar os seus treinos e evolução.
+        </p>
+        <p style="color: #cbbfa3; font-size: 16px; line-height: 1.5;">
+          Para ativar o seu acesso e definir a sua senha inicial, clique no botão abaixo:
+        </p>
+        <div style="margin: 32px 0; text-align: center;">
+          <a href="${setupUrl}" style="background: linear-gradient(90deg, #f2c265, #e2a83e); color: #1a1408; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 6px; display: inline-block; font-size: 16px;">
+            Ativar Conta e Criar Senha
+          </a>
+        </div>
+        <p style="color: #a7a095; font-size: 14px; line-height: 1.5;">
+          Este link de ativação é seguro, de utilização única e expira dentro de 1 hora.
+        </p>
+        <p style="color: #a7a095; font-size: 14px; line-height: 1.5;">
+          Caso o botão acima não funcione, copie e cole o seguinte link no seu navegador:<br/>
+          <a href="${setupUrl}" style="color: #e2a83e; word-break: break-all;">${setupUrl}</a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #232019; margin: 32px 0;" />
+        <p style="color: #6f6a5f; font-size: 12px; margin: 0;">
+          Se não reconhece este convite, ignore este e-mail.
+        </p>
+      </div>
+    `;
+
+    if (!this.resend) {
+      this.logger.log(
+        `[MOCK EMAIL] To: ${to} | Subject: Convite para o FitForge | URL: ${setupUrl}`,
+      );
+      return;
+    }
+
+    try {
+      const response = await this.resend.emails.send({
+        from: this.defaultFrom,
+        to,
+        subject: 'Convite para o FitForge - Ative a sua conta',
+        html,
+      });
+
+      if (response.error) {
+        this.logger.error(
+          `Failed to send student invite email to ${to}: ${response.error.message}`,
+        );
+      } else {
+        this.logger.log(
+          `Student invite email sent successfully to ${to} (ID: ${response.data?.id})`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Exception occurred while sending student invite email to ${to}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
 }

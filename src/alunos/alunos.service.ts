@@ -3,8 +3,11 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { AlunoObjective, AlunoStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AuthService } from '../auth/auth.service.js';
+import { EmailService } from '../email/email.service.js';
 import { hashPassword } from '../auth/password.js';
 import type {
   AlunoListingDto,
@@ -17,7 +20,11 @@ const STATUSES = Object.values(AlunoStatus);
 
 @Injectable()
 export class AlunosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async list(personalId: number, query: AlunoListingQuery): Promise<AlunoListingDto[]> {
     const objective = this.validateEnumFilter(query.objective, OBJECTIVES, 'objective');
@@ -71,15 +78,22 @@ export class AlunosService {
     }));
   }
 
-  async create(personalId: number, input: CreateAlunoDto): Promise<AlunoListingDto> {
+  async create(
+    personalId: number,
+    input: CreateAlunoDto,
+    personalName?: string,
+  ): Promise<AlunoListingDto> {
     const data = this.validateCreateInput(input);
+
+    const randomSecret = randomBytes(32).toString('hex');
+    const passwordHash = await hashPassword(randomSecret);
 
     try {
       const aluno = await this.prisma.user.create({
         data: {
           name: data.name,
           email: data.email,
-          passwordHash: await hashPassword(data.password),
+          passwordHash,
           role: 'aluno',
           personalId,
           objective: data.objective,
@@ -95,6 +109,30 @@ export class AlunosService {
           status: true,
         },
       });
+
+      let personal = personalName;
+      if (!personal) {
+        const personalUser = await this.prisma.user.findUnique({
+          where: { id: personalId },
+          select: { name: true },
+        });
+        personal = personalUser?.name ?? 'Personal Trainer';
+      }
+
+      const { rawToken } = await this.authService.createPasswordResetToken(
+        aluno.id,
+      );
+
+      try {
+        await this.emailService.sendStudentInviteEmail(
+          aluno.email,
+          aluno.name,
+          personal,
+          rawToken,
+        );
+      } catch {
+        // Non-blocking email dispatch failure
+      }
 
       return {
         ...aluno,
@@ -123,8 +161,7 @@ export class AlunosService {
       input.name.trim().length < 2 ||
       typeof input.email !== 'string' ||
       !/^\S+@\S+\.\S+$/.test(input.email.trim()) ||
-      typeof input.password !== 'string' ||
-      input.password.length < 8
+      (input as Record<string, unknown>).password !== undefined
     ) {
       throw new BadRequestException('Invalid aluno data');
     }
@@ -136,7 +173,7 @@ export class AlunosService {
     );
     const level = this.validateEnumFilter(
       typeof input.level === 'string' ? input.level : undefined,
-      Object.values(['iniciante', 'intermediario', 'avancado']),
+      ['iniciante', 'intermediario', 'avancado'],
       'level',
     );
 
@@ -147,7 +184,6 @@ export class AlunosService {
     return {
       name: input.name.trim(),
       email: input.email.trim().toLowerCase(),
-      password: input.password,
       objective,
       level: level as 'iniciante' | 'intermediario' | 'avancado',
     };
