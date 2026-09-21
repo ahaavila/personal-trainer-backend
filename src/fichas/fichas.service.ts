@@ -127,6 +127,14 @@ export class FichasService {
                     name: true,
                     muscleGroup: true,
                     equipment: true,
+                    media: {
+                      select: {
+                        id: true,
+                        kind: true,
+                        contentType: true,
+                        byteSize: true,
+                      },
+                    },
                   },
                 },
               },
@@ -149,6 +157,7 @@ export class FichasService {
         notes: ficha.notes,
         startDate: ficha.startDate,
         endDate: ficha.endDate,
+        status: ficha.status || 'active',
         createdAt: ficha.createdAt,
         alunoId: ficha.alunoId,
         studentId: ficha.aluno.id,
@@ -162,20 +171,27 @@ export class FichasService {
           name: treino.name,
           order: treino.order,
           notes: treino.notes,
-          exercises: treino.treinoExercicios.map((treinoExercicio) => ({
-            id: treinoExercicio.id,
-            exercicioId: treinoExercicio.exercicioId,
-            exerciseId: treinoExercicio.exercicioId,
-            exerciseName: treinoExercicio.exercicio.name,
-            muscleGroup: treinoExercicio.exercicio.muscleGroup,
-            equipment: treinoExercicio.exercicio.equipment,
-            order: treinoExercicio.order,
-            sets: treinoExercicio.sets,
-            reps: treinoExercicio.reps,
-            restInterval: treinoExercicio.restInterval,
-            targetLoad: treinoExercicio.targetLoad,
-            notes: treinoExercicio.notes,
-          })),
+          exercises: treino.treinoExercicios.map((treinoExercicio) => {
+            const media = treinoExercicio.exercicio.media || [];
+            const hasVideo = media.some((m) => m.kind === 'video');
+
+            return {
+              id: treinoExercicio.id,
+              exercicioId: treinoExercicio.exercicioId,
+              exerciseId: treinoExercicio.exercicioId,
+              exerciseName: treinoExercicio.exercicio.name,
+              muscleGroup: treinoExercicio.exercicio.muscleGroup,
+              equipment: treinoExercicio.exercicio.equipment,
+              order: treinoExercicio.order,
+              sets: treinoExercicio.sets,
+              reps: treinoExercicio.reps,
+              restInterval: treinoExercicio.restInterval,
+              targetLoad: treinoExercicio.targetLoad,
+              notes: treinoExercicio.notes,
+              hasVideo,
+              media,
+            };
+          }),
         })),
       };
     });
@@ -206,6 +222,14 @@ export class FichasService {
                     name: true,
                     muscleGroup: true,
                     equipment: true,
+                    media: {
+                      select: {
+                        id: true,
+                        kind: true,
+                        contentType: true,
+                        byteSize: true,
+                      },
+                    },
                   },
                 },
               },
@@ -231,6 +255,7 @@ export class FichasService {
       notes: ficha.notes,
       startDate: ficha.startDate,
       endDate: ficha.endDate,
+      status: ficha.status || 'active',
       createdAt: ficha.createdAt,
       alunoId: ficha.alunoId,
       studentId: ficha.aluno.id,
@@ -244,20 +269,27 @@ export class FichasService {
         name: treino.name,
         order: treino.order,
         notes: treino.notes,
-        exercises: treino.treinoExercicios.map((treinoExercicio) => ({
-          id: treinoExercicio.id,
-          exercicioId: treinoExercicio.exercicioId,
-          exerciseId: treinoExercicio.exercicioId,
-          exerciseName: treinoExercicio.exercicio.name,
-          muscleGroup: treinoExercicio.exercicio.muscleGroup,
-          equipment: treinoExercicio.exercicio.equipment,
-          order: treinoExercicio.order,
-          sets: treinoExercicio.sets,
-          reps: treinoExercicio.reps,
-          restInterval: treinoExercicio.restInterval,
-          targetLoad: treinoExercicio.targetLoad,
-          notes: treinoExercicio.notes,
-        })),
+        exercises: treino.treinoExercicios.map((treinoExercicio) => {
+          const media = treinoExercicio.exercicio.media || [];
+          const hasVideo = media.some((m) => m.kind === 'video');
+
+          return {
+            id: treinoExercicio.id,
+            exercicioId: treinoExercicio.exercicioId,
+            exerciseId: treinoExercicio.exercicioId,
+            exerciseName: treinoExercicio.exercicio.name,
+            muscleGroup: treinoExercicio.exercicio.muscleGroup,
+            equipment: treinoExercicio.exercicio.equipment,
+            order: treinoExercicio.order,
+            sets: treinoExercicio.sets,
+            reps: treinoExercicio.reps,
+            restInterval: treinoExercicio.restInterval,
+            targetLoad: treinoExercicio.targetLoad,
+            notes: treinoExercicio.notes,
+            hasVideo,
+            media,
+          };
+        }),
       })),
     };
   }

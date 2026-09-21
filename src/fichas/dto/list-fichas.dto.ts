@@ -12,6 +12,13 @@ export class ListFichasQueryDto {
   search?: string;
 }
 
+export class FichaExerciseMediaDto {
+  id: number;
+  kind: 'photo' | 'video';
+  contentType: string;
+  byteSize: number;
+}
+
 export class FichaExerciseDto {
   id: number;
   exercicioId: number;
@@ -25,6 +32,8 @@ export class FichaExerciseDto {
   restInterval: string | null;
   targetLoad: string | null;
   notes: string | null;
+  hasVideo?: boolean;
+  media?: FichaExerciseMediaDto[];
 }
 
 export class FichaDivisionDto {
@@ -41,6 +50,7 @@ export class FichaListingDto {
   notes: string | null;
   startDate: Date | null;
   endDate: Date | null;
+  status: string;
   createdAt: Date;
   alunoId: number;
   studentId: number;

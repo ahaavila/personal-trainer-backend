@@ -189,8 +189,8 @@ export class ExerciciosService {
     });
   }
 
-  async media(personalId: number, exerciseId: number) {
-    const exercise = await this.ownedExercise(personalId, exerciseId);
+  async media(user: { id: number; role: string }, exerciseId: number) {
+    const exercise = await this.accessibleExercise(user, exerciseId);
     const mediaList = await this.prisma.exerciseMedia.findMany({
       where: { exercicioId: exercise.id },
       select: { id: true, kind: true, contentType: true, byteSize: true, objectKey: true },
@@ -244,6 +244,41 @@ export class ExerciciosService {
     });
 
     return { message: 'Media removed' };
+  }
+
+  private async accessibleExercise(user: { id: number; role: string }, exerciseId: number) {
+    if (user.role === 'personal') {
+      return this.ownedExercise(user.id, exerciseId);
+    }
+
+    // If student, check if exercise is part of their assigned training plans or created by their personal
+    const student = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { personalId: true },
+    });
+
+    const exercise = await this.prisma.exercicio.findFirst({
+      where: {
+        id: exerciseId,
+        OR: [
+          ...(student?.personalId ? [{ createdByPersonalId: student.personalId }] : []),
+          {
+            treinoExercicios: {
+              some: {
+                treino: {
+                  ficha: {
+                    alunoId: user.id,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    if (!exercise) throw new NotFoundException('Exercise not found');
+    return exercise;
   }
 
   private async ownedExercise(personalId: number, exerciseId: number) {

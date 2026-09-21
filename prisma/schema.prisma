@@ -108,6 +108,7 @@ model FichaDeTreino {
   notes     String?
   startDate DateTime?
   endDate   DateTime?
+  status    String   @default("active")
   aluno     User     @relation("AlunoFichas", fields: [alunoId], references: [id])
   personal  User     @relation("AuthoredFichas", fields: [personalId], references: [id])
   treinos   Treino[]
