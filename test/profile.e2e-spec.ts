@@ -7,7 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('Auth Profile & Change Password (e2e)', () => {
   let app: INestApplication;
-  let _prisma: PrismaService;
+  let prisma: PrismaService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -25,7 +25,7 @@ describe('Auth Profile & Change Password (e2e)', () => {
     );
     await app.init();
 
-    _prisma = app.get(PrismaService);
+    prisma = app.get(PrismaService);
   });
 
   afterAll(async () => {
@@ -252,6 +252,94 @@ describe('Auth Profile & Change Password (e2e)', () => {
           newPassword: 'personal123',
         })
         .expect(200);
+    });
+  });
+
+  describe('Branding API (e2e)', () => {
+    it('returns default null branding for personal on basic plan and rejects updates with 403', async () => {
+      const loginRes = await login('personal@fitforge.app', 'personal123').expect(200);
+      const cookie = sessionCookie(loginRes);
+
+      // Verify basic trainer returns null branding
+      const res = await request(app.getHttpServer())
+        .get('/api/auth/branding')
+        .set('Cookie', cookie)
+        .expect(200);
+
+      expect(res.body.brandLogoUrl).toBeNull();
+      expect(res.body.brandPrimaryColor).toBeNull();
+
+      // Verify basic trainer cannot update branding
+      await request(app.getHttpServer())
+        .patch('/api/auth/branding')
+        .set('Cookie', cookie)
+        .send({ brandPrimaryColor: '#e6b94e' })
+        .expect(403);
+    });
+
+    it('allows PRO personal trainer to update branding and reflects to assigned student', async () => {
+      // Temporarily upgrade personal to PRO in db
+      await prisma.user.update({
+        where: { email: 'personal@fitforge.app' },
+        data: { plan: 'pro' },
+      });
+
+      const personalLogin = await login('personal@fitforge.app', 'personal123').expect(200);
+      const personalCookie = sessionCookie(personalLogin);
+
+      // Test invalid hex color rejection
+      await request(app.getHttpServer())
+        .patch('/api/auth/branding')
+        .set('Cookie', personalCookie)
+        .send({ brandPrimaryColor: 'invalid-hex' })
+        .expect(400);
+
+      // Test valid branding update
+      const updateRes = await request(app.getHttpServer())
+        .patch('/api/auth/branding')
+        .set('Cookie', personalCookie)
+        .send({
+          brandLogoUrl: 'https://example.com/logo.png',
+          brandPrimaryColor: '#e6b94e',
+          brandBackgroundColor: '#0c0a08',
+        })
+        .expect(200);
+
+      expect(updateRes.body.brandLogoUrl).toBe('https://example.com/logo.png');
+      expect(updateRes.body.brandPrimaryColor).toBe('#e6b94e');
+      expect(updateRes.body.brandBackgroundColor).toBe('#0c0a08');
+
+      // Test personal retrieves updated branding
+      const getRes = await request(app.getHttpServer())
+        .get('/api/auth/branding')
+        .set('Cookie', personalCookie)
+        .expect(200);
+
+      expect(getRes.body.brandLogoUrl).toBe('https://example.com/logo.png');
+      expect(getRes.body.brandPrimaryColor).toBe('#e6b94e');
+
+      // Test assigned student (mariana) retrieves the trainer's branding
+      const alunoLogin = await login('mariana@fitforge.app', 'aluno123').expect(200);
+      const alunoCookie = sessionCookie(alunoLogin);
+
+      const alunoBrandingRes = await request(app.getHttpServer())
+        .get('/api/auth/branding')
+        .set('Cookie', alunoCookie)
+        .expect(200);
+
+      expect(alunoBrandingRes.body.brandLogoUrl).toBe('https://example.com/logo.png');
+      expect(alunoBrandingRes.body.brandPrimaryColor).toBe('#e6b94e');
+
+      // Revert personal to basic and clear branding
+      await prisma.user.update({
+        where: { email: 'personal@fitforge.app' },
+        data: {
+          plan: 'basic',
+          brandLogoUrl: null,
+          brandPrimaryColor: null,
+          brandBackgroundColor: null,
+        },
+      });
     });
   });
 });

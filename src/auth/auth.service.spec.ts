@@ -22,6 +22,11 @@ describe('AuthService', () => {
     passwordHash: string;
     name: string;
     role: 'personal' | 'aluno';
+    plan?: any;
+    personalId?: number;
+    brandLogoUrl?: string | null;
+    brandPrimaryColor?: string | null;
+    brandBackgroundColor?: string | null;
     objective?: any;
     level?: any;
     status: any;
@@ -347,6 +352,111 @@ describe('AuthService', () => {
       await expect(
         service.changePassword(1, 'secret123', '12345'),
       ).rejects.toThrow('A nova senha deve ter no mínimo 6 caracteres.');
+    });
+  });
+
+  describe('branding', () => {
+    it('returns custom branding for PRO trainer', async () => {
+      users[0].plan = 'pro';
+      users[0].brandLogoUrl = 'https://example.com/logo.png';
+      users[0].brandPrimaryColor = '#e6b94e';
+      users[0].brandBackgroundColor = '#0c0a08';
+
+      const branding = await service.getBranding(1);
+      expect(branding.brandLogoUrl).toBe('https://example.com/logo.png');
+      expect(branding.brandPrimaryColor).toBe('#e6b94e');
+      expect(branding.brandBackgroundColor).toBe('#0c0a08');
+      expect(branding.logoUrl).toBe('https://example.com/logo.png');
+    });
+
+    it('returns default null branding for basic plan trainer', async () => {
+      users[0].plan = 'basic';
+      users[0].brandLogoUrl = 'https://example.com/logo.png';
+
+      const branding = await service.getBranding(1);
+      expect(branding.brandLogoUrl).toBeNull();
+      expect(branding.brandPrimaryColor).toBeNull();
+      expect(branding.brandBackgroundColor).toBeNull();
+    });
+
+    it('returns trainer branding for student whose trainer is on PRO', async () => {
+      users[0].plan = 'pro';
+      users[0].brandLogoUrl = 'https://example.com/trainer-logo.png';
+      users[0].brandPrimaryColor = '#ff5500';
+      users[0].brandBackgroundColor = '#111111';
+
+      users.push({
+        id: 2,
+        email: 'student@fitforge.app',
+        passwordHash,
+        name: 'Student One',
+        role: 'aluno',
+        personalId: 1,
+        status: 'ativo',
+      });
+
+      const branding = await service.getBranding(2);
+      expect(branding.brandLogoUrl).toBe('https://example.com/trainer-logo.png');
+      expect(branding.brandPrimaryColor).toBe('#ff5500');
+      expect(branding.brandBackgroundColor).toBe('#111111');
+    });
+
+    it('returns default null branding for student whose trainer is on basic', async () => {
+      users[0].plan = 'basic';
+      users[0].brandLogoUrl = 'https://example.com/trainer-logo.png';
+
+      users.push({
+        id: 2,
+        email: 'student@fitforge.app',
+        passwordHash,
+        name: 'Student One',
+        role: 'aluno',
+        personalId: 1,
+        status: 'ativo',
+      });
+
+      const branding = await service.getBranding(2);
+      expect(branding.brandLogoUrl).toBeNull();
+      expect(branding.brandPrimaryColor).toBeNull();
+      expect(branding.brandBackgroundColor).toBeNull();
+    });
+
+    it('allows PRO trainer to update branding', async () => {
+      users[0].plan = 'pro';
+
+      const updated = await service.updateBranding(1, {
+        brandLogoUrl: 'https://example.com/new-logo.png',
+        brandPrimaryColor: '#00ffcc',
+        brandBackgroundColor: '#050505',
+      });
+
+      expect(updated.brandLogoUrl).toBe('https://example.com/new-logo.png');
+      expect(updated.brandPrimaryColor).toBe('#00ffcc');
+      expect(updated.brandBackgroundColor).toBe('#050505');
+      expect(users[0].brandLogoUrl).toBe('https://example.com/new-logo.png');
+    });
+
+    it('rejects branding update if trainer is on basic plan', async () => {
+      users[0].plan = 'basic';
+
+      await expect(
+        service.updateBranding(1, { brandPrimaryColor: '#00ffcc' }),
+      ).rejects.toThrow('Personalização de marca é exclusiva do Plano PRO.');
+    });
+
+    it('rejects branding update if user is not personal trainer', async () => {
+      users.push({
+        id: 3,
+        email: 'student3@fitforge.app',
+        passwordHash,
+        name: 'Student Three',
+        role: 'aluno',
+        status: 'ativo',
+      });
+
+      await expect(
+        service.updateBranding(3, { brandPrimaryColor: '#00ffcc' }),
+      ).rejects.toThrow('Apenas personal trainers podem personalizar a marca.');
     });
   });
 });

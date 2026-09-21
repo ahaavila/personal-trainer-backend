@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -11,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { EmailService } from '../email/email.service.js';
 import { comparePassword, hashPassword } from './password.js';
 import type { UpdateProfileDto } from './update-profile.dto.js';
+import type { BrandingResponseDto, UpdateBrandingDto } from './branding.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -343,5 +345,127 @@ export class AuthService {
     });
 
     return { message: 'Senha alterada com sucesso.' };
+  }
+
+  async getBranding(userId: number): Promise<BrandingResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        plan: true,
+        personalId: true,
+        brandLogoUrl: true,
+        brandPrimaryColor: true,
+        brandBackgroundColor: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilizador não encontrado.');
+    }
+
+    const defaultBranding: BrandingResponseDto = {
+      brandLogoUrl: null,
+      brandPrimaryColor: null,
+      brandBackgroundColor: null,
+      logoUrl: null,
+      primaryColor: null,
+      backgroundColor: null,
+    };
+
+    if (user.role === 'personal') {
+      if (user.plan === 'pro') {
+        return {
+          brandLogoUrl: user.brandLogoUrl,
+          brandPrimaryColor: user.brandPrimaryColor,
+          brandBackgroundColor: user.brandBackgroundColor,
+          logoUrl: user.brandLogoUrl,
+          primaryColor: user.brandPrimaryColor,
+          backgroundColor: user.brandBackgroundColor,
+        };
+      }
+      return defaultBranding;
+    }
+
+    if (user.role === 'aluno' && user.personalId) {
+      const trainer = await this.prisma.user.findUnique({
+        where: { id: user.personalId },
+        select: {
+          plan: true,
+          brandLogoUrl: true,
+          brandPrimaryColor: true,
+          brandBackgroundColor: true,
+        },
+      });
+
+      if (trainer && trainer.plan === 'pro') {
+        return {
+          brandLogoUrl: trainer.brandLogoUrl,
+          brandPrimaryColor: trainer.brandPrimaryColor,
+          brandBackgroundColor: trainer.brandBackgroundColor,
+          logoUrl: trainer.brandLogoUrl,
+          primaryColor: trainer.brandPrimaryColor,
+          backgroundColor: trainer.brandBackgroundColor,
+        };
+      }
+    }
+
+    return defaultBranding;
+  }
+
+  async updateBranding(
+    userId: number,
+    dto: UpdateBrandingDto,
+  ): Promise<BrandingResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, plan: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilizador não encontrado.');
+    }
+
+    if (user.role !== 'personal') {
+      throw new ForbiddenException('Apenas personal trainers podem personalizar a marca.');
+    }
+
+    if (user.plan !== 'pro') {
+      throw new ForbiddenException('Personalização de marca é exclusiva do Plano PRO.');
+    }
+
+    const brandLogoUrl = dto.brandLogoUrl !== undefined ? dto.brandLogoUrl : dto.logoUrl;
+    const brandPrimaryColor = dto.brandPrimaryColor !== undefined ? dto.brandPrimaryColor : dto.primaryColor;
+    const brandBackgroundColor = dto.brandBackgroundColor !== undefined ? dto.brandBackgroundColor : dto.backgroundColor;
+
+    const data: {
+      brandLogoUrl?: string | null;
+      brandPrimaryColor?: string | null;
+      brandBackgroundColor?: string | null;
+    } = {};
+
+    if (brandLogoUrl !== undefined) data.brandLogoUrl = brandLogoUrl;
+    if (brandPrimaryColor !== undefined) data.brandPrimaryColor = brandPrimaryColor;
+    if (brandBackgroundColor !== undefined) data.brandBackgroundColor = brandBackgroundColor;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        brandLogoUrl: true,
+        brandPrimaryColor: true,
+        brandBackgroundColor: true,
+      },
+    });
+
+    return {
+      brandLogoUrl: updated.brandLogoUrl,
+      brandPrimaryColor: updated.brandPrimaryColor,
+      brandBackgroundColor: updated.brandBackgroundColor,
+      logoUrl: updated.brandLogoUrl,
+      primaryColor: updated.brandPrimaryColor,
+      backgroundColor: updated.brandBackgroundColor,
+    };
   }
 }

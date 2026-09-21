@@ -17,9 +17,12 @@ import { AuthService } from './auth.service.js';
 import { ForgotPasswordDto } from './forgot-password.dto.js';
 import type { LoginDto } from './login.dto.js';
 import { ResetPasswordDto } from './reset-password.dto.js';
+import { Roles } from './roles.decorator.js';
+import { RolesGuard } from './roles.guard.js';
 import { SessionAuthGuard, type AuthenticatedRequest } from './session-auth.guard.js';
 import { UpdateProfileDto } from './update-profile.dto.js';
 import { ChangePasswordDto } from './change-password.dto.js';
+import { UpdateBrandingDto } from './branding.dto.js';
 
 const SESSION_COOKIE_NAME = 'session';
 const SESSION_COOKIE_OPTIONS = {
@@ -122,5 +125,21 @@ export class AuthController {
       body.currentPassword,
       body.newPassword,
     );
+  }
+
+  @Get('branding')
+  @UseGuards(SessionAuthGuard)
+  async getBranding(@Req() request: AuthenticatedRequest) {
+    return this.authService.getBranding(request.user!.id);
+  }
+
+  @Patch('branding')
+  @UseGuards(SessionAuthGuard, RolesGuard)
+  @Roles('personal')
+  async updateBranding(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateBrandingDto,
+  ) {
+    return this.authService.updateBranding(request.user!.id, body);
   }
 }

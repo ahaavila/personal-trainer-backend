@@ -59,6 +59,38 @@ export class SubscriptionService {
       throw new ForbiddenException('Apenas personal trainers têm acesso à subscrição.');
     }
 
+    // Fallback sync: if trainer has a stripeCustomerId and is still 'basic', check directly with Stripe
+    // in case webhook was delayed or tunnel was down
+    if (this.stripe && trainer.stripeCustomerId && trainer.plan === 'basic') {
+      try {
+        const subs = await this.stripe.subscriptions.list({
+          customer: trainer.stripeCustomerId,
+          status: 'active',
+          limit: 1,
+        });
+
+        if (subs.data.length > 0) {
+          const activeSub = subs.data[0] as any;
+          await this.prisma.user.update({
+            where: { id: trainer.id },
+            data: {
+              plan: 'pro',
+              subscriptionStatus: 'active',
+              stripeSubscriptionId: activeSub.id,
+              currentPeriodEnd: activeSub.current_period_end
+                ? new Date(activeSub.current_period_end * 1000)
+                : null,
+            },
+          });
+          trainer.plan = 'pro';
+          trainer.subscriptionStatus = 'active';
+          this.logger.log(`Auto-synced active Stripe subscription for user ${trainer.id}`);
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to auto-sync Stripe subscription for user ${trainer.id}: ${err}`);
+      }
+    }
+
     const activeStudents = await this.prisma.user.count({
       where: { personalId: trainerId, role: 'aluno', status: 'ativo' },
     });
@@ -90,7 +122,7 @@ export class SubscriptionService {
       throw new ForbiddenException('Apenas personal trainers podem assinar o Plano PRO.');
     }
 
-    const successUrl = `${this.frontendUrl.replace(/\/$/, '')}/planos?upgraded=true`;
+    const successUrl = `${this.frontendUrl.replace(/\/$/, '')}/planos?upgraded=true&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${this.frontendUrl.replace(/\/$/, '')}/planos?canceled=true`;
 
     if (!this.stripe || !this.proPriceId) {
