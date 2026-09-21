@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { AlunoObjective, AlunoStatus } from '@prisma/client';
@@ -14,9 +16,11 @@ import type {
   AlunoListingQuery,
   CreateAlunoDto,
 } from './aluno-listing.dto.js';
+import type { UpdateAlunoStatusDto } from './update-aluno-status.dto.js';
 
 const OBJECTIVES = Object.values(AlunoObjective);
 const STATUSES = Object.values(AlunoStatus);
+export const BASIC_PLAN_MAX_ACTIVE_STUDENTS = 5;
 
 @Injectable()
 export class AlunosService {
@@ -85,6 +89,27 @@ export class AlunosService {
   ): Promise<AlunoListingDto> {
     const data = this.validateCreateInput(input);
 
+    const trainer = await this.prisma.user.findUnique({
+      where: { id: personalId },
+      select: { name: true, plan: true, role: true },
+    });
+
+    if (!trainer || trainer.role !== 'personal') {
+      throw new ForbiddenException('Apenas personal trainers podem criar alunos.');
+    }
+
+    if (trainer.plan === 'basic') {
+      const activeCount = await this.prisma.user.count({
+        where: { personalId, role: 'aluno', status: 'ativo' },
+      });
+
+      if (activeCount >= BASIC_PLAN_MAX_ACTIVE_STUDENTS) {
+        throw new ForbiddenException(
+          'Atingiu o limite de 5 alunos ativos do Plano Básico. Faça o upgrade para o Plano PRO.',
+        );
+      }
+    }
+
     const randomSecret = randomBytes(32).toString('hex');
     const passwordHash = await hashPassword(randomSecret);
 
@@ -110,14 +135,7 @@ export class AlunosService {
         },
       });
 
-      let personal = personalName;
-      if (!personal) {
-        const personalUser = await this.prisma.user.findUnique({
-          where: { id: personalId },
-          select: { name: true },
-        });
-        personal = personalUser?.name ?? 'Personal Trainer';
-      }
+      const personal = personalName || trainer.name || 'Personal Trainer';
 
       const { rawToken } = await this.authService.createPasswordResetToken(
         aluno.id,
@@ -153,6 +171,72 @@ export class AlunosService {
 
       throw error;
     }
+  }
+
+  async updateStatus(
+    personalId: number,
+    alunoId: number,
+    dto: UpdateAlunoStatusDto,
+  ): Promise<AlunoListingDto> {
+    const aluno = await this.prisma.user.findFirst({
+      where: { id: alunoId, personalId, role: 'aluno' },
+      include: {
+        assignedFichas: {
+          select: {
+            treinos: {
+              where: { completedAt: { not: null } },
+              orderBy: { completedAt: 'desc' },
+              take: 1,
+              select: { name: true, completedAt: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!aluno) {
+      throw new NotFoundException('Aluno não encontrado para este personal.');
+    }
+
+    if (dto.status === 'ativo' && aluno.status !== 'ativo') {
+      const trainer = await this.prisma.user.findUnique({
+        where: { id: personalId },
+        select: { plan: true },
+      });
+
+      if (trainer?.plan === 'basic') {
+        const activeCount = await this.prisma.user.count({
+          where: { personalId, role: 'aluno', status: 'ativo' },
+        });
+
+        if (activeCount >= BASIC_PLAN_MAX_ACTIVE_STUDENTS) {
+          throw new ForbiddenException(
+            'Atingiu o limite de 5 alunos ativos do Plano Básico. Faça o upgrade para o Plano PRO.',
+          );
+        }
+      }
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: alunoId },
+      data: { status: dto.status },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        objective: true,
+        level: true,
+        status: true,
+      },
+    });
+
+    return {
+      ...updated,
+      objective: updated.objective ?? 'não informado',
+      level: updated.level ?? 'não informado',
+      status: updated.status ?? 'não informado',
+      latestWorkout: this.latestWorkout(aluno.assignedFichas),
+    };
   }
 
   private validateCreateInput(input: CreateAlunoDto) {

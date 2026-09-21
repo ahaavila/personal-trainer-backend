@@ -34,6 +34,19 @@ enum AlunoStatus {
   inativo
 }
 
+enum SubscriptionPlan {
+  basic
+  pro
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+  trialing
+  unpaid
+}
+
 enum ExerciseMediaKind {
   photo
   video
@@ -46,6 +59,11 @@ model User {
   name              String
   role              Role
   avatarUrl         String?
+  plan              SubscriptionPlan   @default(basic)
+  subscriptionStatus SubscriptionStatus? @default(active)
+  stripeCustomerId  String?            @unique
+  stripeSubscriptionId String?
+  currentPeriodEnd  DateTime?
   personalId        Int?
   objective         AlunoObjective?
   level             AlunoLevel?

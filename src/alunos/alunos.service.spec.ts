@@ -23,6 +23,7 @@ describe('AlunosService', () => {
         name: 'Personal Trainer',
         email: 'personal@fitforge.app',
         role: 'personal',
+        plan: 'basic',
         status: 'ativo',
       },
     ];
@@ -46,8 +47,33 @@ describe('AlunosService', () => {
               })),
           );
         },
+        findFirst: (args: any) => {
+          const user = users.find((u) => {
+            if (args.where.id && u.id !== args.where.id) return false;
+            if (args.where.personalId && u.personalId !== args.where.personalId) return false;
+            if (args.where.role && u.role !== args.where.role) return false;
+            return true;
+          });
+          return Promise.resolve(user ? { ...user, assignedFichas: [] } : null);
+        },
         findUnique: (args: any) => {
           const user = users.find((u) => u.id === args.where.id);
+          return Promise.resolve(user ? { ...user } : null);
+        },
+        count: (args: any) => {
+          const count = users.filter((u) => {
+            if (args.where.personalId && u.personalId !== args.where.personalId) return false;
+            if (args.where.role && u.role !== args.where.role) return false;
+            if (args.where.status && u.status !== args.where.status) return false;
+            return true;
+          }).length;
+          return Promise.resolve(count);
+        },
+        update: (args: any) => {
+          const user = users.find((u) => u.id === args.where.id);
+          if (user) {
+            Object.assign(user, args.data);
+          }
           return Promise.resolve(user ? { ...user } : null);
         },
         create: (args: any) => {
@@ -232,6 +258,111 @@ describe('AlunosService', () => {
           level: 'iniciante',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects creation when personal on basic plan already has 5 active students', async () => {
+      const personalId = 1;
+      for (let i = 1; i <= 5; i++) {
+        users.push({
+          id: 10 + i,
+          email: `active${i}@fitforge.app`,
+          name: `Active ${i}`,
+          role: 'aluno',
+          personalId,
+          status: 'ativo',
+        });
+      }
+
+      await expect(
+        service.create(personalId, {
+          name: 'Student 6',
+          email: 'student6@fitforge.app',
+          objective: 'hipertrofia',
+          level: 'iniciante',
+        }),
+      ).rejects.toThrow(
+        'Atingiu o limite de 5 alunos ativos do Plano Básico. Faça o upgrade para o Plano PRO.',
+      );
+    });
+
+    it('allows creation beyond 5 active students when personal is on pro plan', async () => {
+      const personalId = 1;
+      users[0].plan = 'pro';
+      for (let i = 1; i <= 5; i++) {
+        users.push({
+          id: 10 + i,
+          email: `active${i}@fitforge.app`,
+          name: `Active ${i}`,
+          role: 'aluno',
+          personalId,
+          status: 'ativo',
+        });
+      }
+
+      const result = await service.create(personalId, {
+        name: 'Student 6',
+        email: 'student6@fitforge.app',
+        objective: 'hipertrofia',
+        level: 'iniciante',
+      });
+
+      expect(result.name).toBe('Student 6');
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('successfully changes aluno status to inativo', async () => {
+      users.push({
+        id: 20,
+        email: 'to-inactivate@fitforge.app',
+        name: 'Student Inactivate',
+        role: 'aluno',
+        personalId: 1,
+        status: 'ativo',
+      });
+
+      const updated = await service.updateStatus(1, 20, { status: 'inativo' });
+      expect(updated.status).toBe('inativo');
+    });
+
+    it('rejects reactivating aluno to ativo when quota of 5 is exceeded on basic plan', async () => {
+      users.push({
+        id: 20,
+        email: 'to-reactivate@fitforge.app',
+        name: 'Student Reactivate',
+        role: 'aluno',
+        personalId: 1,
+        status: 'inativo',
+      });
+
+      for (let i = 1; i <= 5; i++) {
+        users.push({
+          id: 30 + i,
+          email: `active${i}@fitforge.app`,
+          name: `Active ${i}`,
+          role: 'aluno',
+          personalId: 1,
+          status: 'ativo',
+        });
+      }
+
+      await expect(service.updateStatus(1, 20, { status: 'ativo' })).rejects.toThrow(
+        'Atingiu o limite de 5 alunos ativos do Plano Básico. Faça o upgrade para o Plano PRO.',
+      );
+    });
+
+    it('allows reactivating aluno to ativo when slots are available', async () => {
+      users.push({
+        id: 20,
+        email: 'to-reactivate@fitforge.app',
+        name: 'Student Reactivate',
+        role: 'aluno',
+        personalId: 1,
+        status: 'inativo',
+      });
+
+      const updated = await service.updateStatus(1, 20, { status: 'ativo' });
+      expect(updated.status).toBe('ativo');
     });
   });
 

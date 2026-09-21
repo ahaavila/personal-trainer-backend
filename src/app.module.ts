@@ -8,6 +8,7 @@ import { AlunosModule } from './alunos/alunos.module.js';
 import { ExerciciosModule } from './exercicios/exercicios.module.js';
 import { FichasModule } from './fichas/fichas.module.js';
 import { ProgressoModule } from './progresso/progresso.module.js';
+import { SubscriptionModule } from './subscription/subscription.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { EmailModule } from './email/email.module.js';
 
@@ -22,6 +23,7 @@ import { EmailModule } from './email/email.module.js';
     ExerciciosModule,
     FichasModule,
     ProgressoModule,
+    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
